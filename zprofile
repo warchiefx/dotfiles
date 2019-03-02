@@ -75,6 +75,6 @@ if [[ ! -d "${TMPDIR}" ]]; then
   mkdir -m 700 "${TMPDIR}"
 fi
 # Ubuntu make installation of Ubuntu Make binary symlink
-PATH=$HOME/.local/share/umake/bin:$PATH
+PATH=$HOME/.local/share/umake/bin:$HOME/.luarocks/bin:$PATH
 
 [[ -e ~/.profile ]] && emulate sh -c 'source ~/.profile'
