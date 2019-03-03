@@ -4,7 +4,7 @@
 #bold_is_bright = true
 #clickable_url = true
 #dynamic_title = true
-font = Iosevka Term 11
+font = Iosevka Term 12
 #fullscreen = true
 #icon_name = terminal
 #mouse_autohide = false
@@ -37,46 +37,45 @@ cursor_shape = block
 
 # "off", "left" or "right"
 #scrollbar = off
-
 [colors]
 # special
-foreground      = #ffffff
-foreground_bold = #ffffff
-cursor          = #ffffff
-# background      = #1b1b1bdd
+foreground      = #f1fcf9
+foreground_bold = #f1fcf9
+cursor          = #f1fcf9
+# background      = #282f37
 background      = rgba(0, 0, 0, 0.8)
 
 # black
-color0  = #3d3d3d
-color8  = #4d4d4d
+color0  = #20262c
+color8  = #465463
 
 # red
-color1  = #6673bf
-color9  = #899aff
+color1  = #db86ba
+color9  = #d04e9d
 
 # green
-color2  = #3ea290
-color10 = #52ad91
+color2  = #74dd91
+color10 = #4bc66d
 
 # yellow
-color3  = #b0ead9
-color11 = #98c9bb
+color3  = #e49186
+color11 = #db695b
 
 # blue
-color4  = #31658c
-color12 = #477ab3
+color4  = #75dbe1
+color12 = #3dbac2
 
 # magenta
-color5  = #596196
-color13 = #7882bf
+color5  = #b4a1db
+color13 = #825ece
 
 # cyan
-color6  = #8292b2
-color14 = #95a7cc
+color6  = #9ee9ea
+color14 = #62cdcd
 
 # white
-color7  = #c8cacc
-color15 = #edeff2
+color7  = #f1fcf9
+color15 = #e0e5e5
 
 [hints]
 #font = Monospace 12
