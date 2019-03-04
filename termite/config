@@ -39,9 +39,9 @@ cursor_shape = block
 #scrollbar = off
 [colors]
 # special
-foreground      = #f1fcf9
-foreground_bold = #f1fcf9
-cursor          = #f1fcf9
+foreground      = #c5c8c6
+foreground_bold = #c5c8c6
+cursor          = #c5c8c6
 # background      = #282f37
 background      = rgba(0, 0, 0, 0.8)
 
