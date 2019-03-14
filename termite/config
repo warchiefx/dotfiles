@@ -4,7 +4,7 @@
 #bold_is_bright = true
 #clickable_url = true
 #dynamic_title = true
-font = Iosevka Term 12
+font = Iosevka Term 10.5
 #fullscreen = true
 #icon_name = terminal
 #mouse_autohide = false
@@ -43,7 +43,7 @@ foreground      = #c5c8c6
 foreground_bold = #c5c8c6
 cursor          = #c5c8c6
 # background      = #282f37
-background      = rgba(0, 0, 0, 0.8)
+background      = rgba(0, 0, 0, 0.95)
 
 # black
 color0  = #20262c
