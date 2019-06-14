@@ -11,7 +11,13 @@ alias vi=vim
 alias tail=colortail
 alias murder='sudo kill -9'
 alias t=task
+# If bat (https://github.com/sharkdp/bat) is available, use instead of cat
+command -v bat >/dev/null 2>&1 && alias cat=bat
 
+function customtail {
+    tail $* | bat --paging=never -l log
+}
+command -v bat >/dev/null 2>&1 && alias tail=customtail
 
 export EDITOR=emacsclient
 
