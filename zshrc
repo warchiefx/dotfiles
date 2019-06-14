@@ -63,4 +63,12 @@ autoload -Uz prompinit
 promptinit
 prompt kylewest
 
+function copy_tmux_conf {
+    sftp $1 <<EOF
+put $HOME/.tmux.conf
+EOF
+
+    ssh $1 git clone https://github.com/tmux-plugins/tpm .tmux/plugins/tpm
+}
+
 [[ -s "$HOME/.local/share/marker/marker.sh" ]] && source "$HOME/.local/share/marker/marker.sh"
