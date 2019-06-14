@@ -64,6 +64,11 @@ promptinit
 prompt kylewest
 
 function copy_tmux_conf {
+    if [ $# -eq 0 ]
+    then
+        echo "No arguments supplied, expected a server url"
+        return -1
+    fi
     sftp $1 <<EOF
 put $HOME/.tmux.conf
 EOF
