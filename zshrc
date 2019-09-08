@@ -40,7 +40,7 @@ function jump {
     if [[ -f $MARKPATH/$1/Pipfile && -n `command -v pipenv` ]]; then
         pipenv shell
     elif [ -f $MARKPATH/$1/.python-version ]; then
-        workon `cat $MARKPATH/$1/.python-version`
+        pyenv activate
     elif [ -f $MARKPATH/$1/.python-env ]; then
         workon `cat $MARKPATH/$1/.python-env`
     elif [ -d ~/.virtualenvs/$1 ]; then
