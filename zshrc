@@ -41,6 +41,8 @@ function jump {
         pipenv shell
     elif [ -f $MARKPATH/$1/.python-version ]; then
         workon `cat $MARKPATH/$1/.python-version`
+    elif [ -f $MARKPATH/$1/.python-env ]; then
+        workon `cat $MARKPATH/$1/.python-env`
     elif [ -d ~/.virtualenvs/$1 ]; then
         workon $1;
     fi
@@ -77,3 +79,7 @@ EOF
 }
 
 [[ -s "$HOME/.local/share/marker/marker.sh" ]] && source "$HOME/.local/share/marker/marker.sh"
+
+command -v kubectl >/dev/null 2>&1 && source <(kubectl completion zsh)
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
