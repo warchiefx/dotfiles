@@ -81,5 +81,5 @@ EOF
 [[ -s "$HOME/.local/share/marker/marker.sh" ]] && source "$HOME/.local/share/marker/marker.sh"
 
 command -v kubectl >/dev/null 2>&1 && source <(kubectl completion zsh)
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
+command -v pyenv >/dev/null 2>&1 && eval "$(pyenv init -)"
+command -v pyenv >/dev/null 2>&1 && eval "$(pyenv virtualenv-init -)"
