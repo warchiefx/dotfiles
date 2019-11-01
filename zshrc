@@ -83,3 +83,5 @@ EOF
 command -v kubectl >/dev/null 2>&1 && source <(kubectl completion zsh)
 command -v pyenv >/dev/null 2>&1 && eval "$(pyenv init -)"
 command -v pyenv >/dev/null 2>&1 && eval "$(pyenv virtualenv-init -)"
+
+eval $(keychain -q -Q --eval --agents ssh --inherit any)

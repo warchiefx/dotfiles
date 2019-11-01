@@ -78,3 +78,5 @@ fi
 PATH=$HOME/.local/bin:$HOME/.local/share/umake/bin:$HOME/.luarocks/bin:$PATH
 
 [[ -e ~/.profile ]] && emulate sh -c 'source ~/.profile'
+
+eval $(keychain -q -Q --eval --agents ssh --inherit any)
