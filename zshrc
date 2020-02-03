@@ -8,7 +8,6 @@ fi
 # Customize to your needs...
 alias e=emacsclient
 alias vi=vim
-alias tail=colortail
 alias murder='sudo kill -9'
 alias t=task
 # If bat (https://github.com/sharkdp/bat) is available, use instead of cat
