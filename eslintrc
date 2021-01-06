@@ -25,14 +25,16 @@
     }
   },
   "rules": {
-    "consistent-return": [0],
-    "key-spacing": [0],
-    "quotes": [0],
-    "new-cap": [0],
-    "no-multi-spaces": [0],
-    "no-shadow": [0],
-    "no-unused-vars": [1],
-    "no-use-before-define": [2, "nofunc"],
-    "semi": 2
+    'no-unused-vars': ['error', { ignoreRestSiblings: true }],
+    'arrow-body-style': ['error', 'as-needed'],
+    'prefer-const': 'error',
+    'no-var': 'error',
+    'no-shadow': 'error',
+    'object-shorthand': 'error',
+    'require-await': 'error',
+    'jest/no-disabled-tests': 'warn',
+    'jest/no-focused-tests': 'error',
+    'no-nested-ternary': 'error',
+    'extra-rules/no-commented-out-code': 'error',
   }
 }
