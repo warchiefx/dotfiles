@@ -79,4 +79,13 @@ PATH=$HOME/.local/bin:$HOME/.local/share/umake/bin:$HOME/.luarocks/bin:$PATH
 
 [[ -e ~/.profile ]] && emulate sh -c 'source ~/.profile'
 
-eval $(keychain -q -Q --eval --agents ssh --inherit any)
+# eval $(keychain -q -Q --eval --agents ssh --inherit any)
+
+##
+# Your previous /Users/warchiefx/.zprofile file was backed up as /Users/warchiefx/.zprofile.macports-saved_2021-03-02_at_21:02:51
+##
+
+# MacPorts Installer addition on 2021-03-02_at_21:02:51: adding an appropriate PATH variable for use with MacPorts.
+export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
+# Finished adapting your PATH environment variable for use with MacPorts.
+

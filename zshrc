@@ -24,7 +24,7 @@ export EDITOR=emacsclient
 if [ -f /bin/virtualenvwrapper_lazy.sh ]; then
     # Usually available here in Arch
     source /bin/virtualenvwrapper_lazy.sh
-else
+elif [ -f /usr/share/virtualenvwrapper/virtualenvwrapper_lazu.sh ]; then
     # ubuntu puts it here
     source /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh
 fi
@@ -40,6 +40,7 @@ function jump {
         pipenv shell
     elif [ -f $MARKPATH/$1/.python-version ]; then
         pyenv activate
+	command -v pyenv >/dev/null 2>&1 && eval "$(pyenv virtualenvwrapper_lazy -)"
     elif [ -f $MARKPATH/$1/.python-env ]; then
         workon `cat $MARKPATH/$1/.python-env`
     elif [ -d ~/.virtualenvs/$1 ]; then
@@ -106,5 +107,7 @@ load-nvmrc() {
 }
 add-zsh-hook chpwd load-nvmrc
 load-nvmrc
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-eval $(keychain -q -Q --eval --agents ssh --inherit any)
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
