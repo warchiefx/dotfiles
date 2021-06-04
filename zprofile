@@ -89,3 +89,6 @@ PATH=$HOME/.local/bin:$HOME/.local/share/umake/bin:$HOME/.luarocks/bin:$PATH
 export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
 # Finished adapting your PATH environment variable for use with MacPorts.
 
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
