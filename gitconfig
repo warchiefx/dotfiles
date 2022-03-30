@@ -1,0 +1,20 @@
+[pull]
+	rebase = false
+[user]
+	name = Ricardo Restituyo
+	username = warchiefx@gmail.com
+	email = warchiefx@gmail.com
+[push]
+	default = current
+[color]
+	ui = true
+[init]
+	defaultbranch = master
+[core]
+  pager = delta
+[merge]
+  conflictstyle = diff3
+[diff]
+  colorMoved = default
+[interactive]
+  diffFilter = delta --color-only
