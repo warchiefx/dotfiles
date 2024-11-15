@@ -17,8 +17,8 @@ fi
 # Editors
 #
 
-export EDITOR='emacsclient'
-export VISUAL='emacsclient'
+export EDITOR='vim'
+export VISUAL='vim'
 export PAGER='less'
 
 #
@@ -92,3 +92,4 @@ export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init --path)"
+eval "$(/opt/homebrew/bin/brew shellenv)"

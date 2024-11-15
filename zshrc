@@ -10,6 +10,7 @@ alias e=emacsclient
 alias vi=vim
 alias murder='sudo kill -9'
 alias t=task
+alias k=kubectl
 # If bat (https://github.com/sharkdp/bat) is available, use instead of cat
 command -v bat >/dev/null 2>&1 && alias cat=bat
 
@@ -18,7 +19,7 @@ function customtail {
 }
 command -v bat >/dev/null 2>&1 && alias tail=customtail
 
-export EDITOR=emacsclient
+export EDITOR=vim
 
 # Setup virtualenvwrapper
 if [ -f /bin/virtualenvwrapper_lazy.sh ]; then
@@ -110,4 +111,8 @@ load-nvmrc
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
+# opam configuration
+[[ ! -r /Users/warchiefx/.opam/opam-init/init.zsh ]] || source /Users/warchiefx/.opam/opam-init/init.zsh  > /dev/null 2> /dev/null
+eval "$(starship init zsh)"
 

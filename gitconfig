@@ -2,8 +2,6 @@
 	rebase = false
 [user]
 	name = Ricardo Restituyo
-	username = warchiefx@gmail.com
-	email = warchiefx@gmail.com
 [push]
 	default = current
 [color]
