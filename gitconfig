@@ -16,3 +16,5 @@
   colorMoved = default
 [interactive]
   diffFilter = delta --color-only
+[alias]
+	prune-branches = !git fetch -p && git branch -vv | awk \"/: gone]/ {print \\$1}\" | xargs git branch -D

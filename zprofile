@@ -90,6 +90,11 @@ export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
 # Finished adapting your PATH environment variable for use with MacPorts.
 
 export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
+export PATH="$HOME/bin:$PYENV_ROOT/bin:$PATH"
+# eval "$(pyenv init --path)"
 eval "$(/opt/homebrew/bin/brew shellenv)"
+
+export OPENROUTER_API_KEY="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"
+export AWS_PROFILE=shared-management
+
+export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
