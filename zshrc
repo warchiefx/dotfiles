@@ -1,6 +1,6 @@
 # OPENSPEC:START
 # OpenSpec shell completions configuration
-fpath=("/Users/rrestituyo/.zsh/completions" $fpath)
+fpath=("/Users/warchiefx/.zsh/completions" $fpath)
 autoload -Uz compinit
 compinit
 # OPENSPEC:END
@@ -69,9 +69,16 @@ function marks {
 alias j=jump
 alias m=mark
 
-autoload -Uz prompinit
-promptinit
-prompt kylewest
+# Clean prompt with git status
+setopt prompt_subst
+autoload -Uz vcs_info
+zstyle ':vcs_info:*' enable git
+zstyle ':vcs_info:git:*' formats '%F{242}on%f %F{magenta}%b%f '
+zstyle ':vcs_info:git:*' actionformats '%F{242}on%f %F{magenta}%b%f|%F{red}%a%f '
+precmd() {
+  vcs_info
+}
+PROMPT='%F{cyan}%~%f ${vcs_info_msg_0_}%F{yellow}❯%f '
 
 function copy_tmux_conf {
     if [ $# -eq 0 ]
@@ -128,7 +135,7 @@ test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell
 # eval "$(starship init zsh)"
 
 # The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Users/rrestituyo/.docker/completions $fpath)
+fpath=(/Users/warchiefx/.docker/completions $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
