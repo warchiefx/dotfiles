@@ -94,6 +94,9 @@ export PATH="$HOME/bin:$PYENV_ROOT/bin:$PATH"
 # eval "$(pyenv init --path)"
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+# Add rust
+export PATH="$HOME/.cargo/bin:$PATH"
+
 export OPENROUTER_API_KEY="<notset>"
 export AWS_PROFILE=shared-management
 
