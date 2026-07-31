@@ -2,6 +2,7 @@
 	rebase = false
 [user]
 	name = Ricardo Restituyo
+	email = ricardo.restituyo@finally.com
 [push]
 	default = current
 [color]
@@ -18,3 +19,9 @@
   diffFilter = delta --color-only
 [alias]
 	prune-branches = !git fetch -p && git branch -vv | awk \"/: gone]/ {print \\$1}\" | xargs git branch -D
+[credential "https://github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential

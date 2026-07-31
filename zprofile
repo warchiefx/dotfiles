@@ -101,3 +101,7 @@ export OPENROUTER_API_KEY="<notset>"
 export AWS_PROFILE=shared-management
 
 export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/rrestituyo/.local/bin:$PATH"

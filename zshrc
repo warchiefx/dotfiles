@@ -139,3 +139,7 @@ fpath=(/Users/warchiefx/.docker/completions $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/rrestituyo/.local/bin:$PATH"
