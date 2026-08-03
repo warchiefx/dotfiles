@@ -105,3 +105,7 @@ export DYLD_LIBRARY_PATH="/opt/homebrew/lib:$DYLD_LIBRARY_PATH"
 
 # Added by Antigravity CLI installer
 export PATH="/Users/rrestituyo/.local/bin:$PATH"
+
+# Source local machine-specific zprofile overrides if present
+[[ -f ~/.zprofile.local ]] && source ~/.zprofile.local
+
