@@ -1,0 +1,26 @@
+# Window style
+window-step-resize = true
+window-height = 100
+window-width = 100
+
+# Misc.
+copy-on-select = false
+macos-option-as-alt = true
+macos-titlebar-style = hidden
+
+# Keybindings
+keybind = global:ctrl+escape=toggle_quick_terminal
+
+theme = ayu
+background-opacity = 0.83
+
+cursor-style = block
+mouse-hide-while-typing = true
+background-blur-radius = 20
+quick-terminal-position = bottom
+quick-terminal-size = 45%
+
+font-family = "Iosevka Term"
+font-size = 16
+
+theme = Horizon
