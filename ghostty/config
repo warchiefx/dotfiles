@@ -24,3 +24,27 @@ font-family = "Iosevka Term"
 font-size = 16
 
 theme = Horizon
+
+# Terminal identity over ssh and sudo.
+#
+# Ghostty reports TERM=xterm-ghostty and points TERMINFO at its own bundle. That
+# entry is richer than xterm-256color (truecolor via Tc/setrgbf, full key
+# reporting), so nothing should be overriding it locally -- but a remote host
+# will not have the entry, which used to be worked around by exporting
+# TERM=xterm-256color from ~/.zshrc. That fixed ssh by lying to every other
+# program, tmux and Emacs included.
+#
+# Fixed at the source instead:
+#   ssh-terminfo  installs the xterm-ghostty entry on the remote host with
+#                 infocmp + tic (cached per host, see `ghostty +ssh-cache`), and
+#                 falls back to xterm-256color for that session alone when the
+#                 remote has no tic.
+#   ssh-env       forwards COLORTERM/TERM_PROGRAM so the remote knows it has
+#                 truecolor.
+#   sudo          keeps TERMINFO across sudo, which otherwise drops it and
+#                 leaves `sudo emacs -nw` without a terminfo entry.
+#
+# The defaults being kept (cursor, title, path) are listed explicitly so this
+# does not depend on whether an explicit list replaces the defaults or adds to
+# them.
+shell-integration-features = cursor,sudo,title,path,ssh-env,ssh-terminfo

@@ -37,7 +37,19 @@ elif [ -f /usr/share/virtualenvwrapper/virtualenvwrapper_lazu.sh ]; then
     source /usr/share/virtualenvwrapper/virtualenvwrapper_lazy.sh
 fi
 
-export TERM=xterm-256color
+# Deliberately do NOT set TERM here.  The terminal emulator is the only thing
+# that knows what it can actually do, and tmux rewrites TERM for its panes;
+# exporting a value from an interactive rc file overwrites both.  Ghostty sets
+# TERM=xterm-ghostty (truecolor, full key reporting) plus TERMINFO into its own
+# bundle, and tmux sets tmux-256color inside a pane.  Forcing xterm-256color
+# here -- a leftover from Linux, where the terminal often under-reported --
+# told Emacs it was talking to a real xterm when it was talking to tmux, which
+# is what broke the arrow keys over ssh, and cost truecolor inside tmux.
+#
+# A remote host that lacks the xterm-ghostty entry is handled at the source
+# instead: shell-integration-features = ssh-env,ssh-terminfo in the Ghostty
+# config installs the entry over ssh, falling back to xterm-256color for that
+# session alone.
 
 # From: http://jeroenjanssens.com/2013/08/16/quickly-navigate-your-filesystem-from-the-command-line.html
 export MARKPATH=$HOME/.marks

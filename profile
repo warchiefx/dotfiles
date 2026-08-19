@@ -19,7 +19,9 @@ fi
 # set PATH so it includes user's private bin directories
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH:$HOME/.scripts"
 
-export TERM=xterm-256color
+# No TERM here either -- see the note in ./zshrc.  This file is sourced by
+# zprofile for every login shell, so an export here clobbers TERM just as
+# thoroughly as one in zshrc does.
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
