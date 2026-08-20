@@ -6,4 +6,3 @@ zshrc                   ~/.zshrc
 zshenv                  ~/.zshenv
 zprofile                ~/.zprofile
 zpreztorc               ~/.zpreztorc
-profile                 ~/.profile

@@ -30,7 +30,7 @@ plugins, and installs mosh — then checks the thing that actually breaks mosh.
 The files are grouped by feature, one directory each:
 
 ```
-shell/     zshrc zshenv zprofile zpreztorc profile
+shell/     zshrc zshenv zprofile zpreztorc
 tmux/      tmux.conf
 git/       gitconfig
 terminal/  ghostty/ termite/ Xresources
