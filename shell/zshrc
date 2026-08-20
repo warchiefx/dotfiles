@@ -161,3 +161,36 @@ test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell
 
 # Local user binaries
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+# SSH Agent: reuse existing or start a shared agent for all shells
+# ---------------------------------------------------------------------------
+_setup_ssh_agent() {
+  # If an agent is already reachable via current SSH_AUTH_SOCK, keep it
+  # (exit code 0: identities loaded; exit code 1: agent alive, no keys)
+  if [[ -n "${SSH_AUTH_SOCK-}" ]]; then
+    ssh-add -l >/dev/null 2>&1
+    (( $? <= 1 )) && return 0
+  fi
+  # On macOS with launchd, SSH_AUTH_SOCK is already managed by the OS
+  if [[ -n "${SSH_AUTH_SOCK-}" && "$OSTYPE" == darwin* ]]; then
+    return 0
+  fi
+
+  local sock_dir="${HOME}/.ssh"
+  local sock_file="${sock_dir}/ssh-agent.sock"
+  [[ -d "$sock_dir" ]] || mkdir -p -m 700 "$sock_dir"
+
+  export SSH_AUTH_SOCK="$sock_file"
+  # Test if existing socket responds
+  if ! ssh-add -l >/dev/null 2>&1; then
+    local exit_code=$?
+    # Exit code 2 means agent socket is unreachable/dead
+    if [[ $exit_code -eq 2 ]]; then
+      rm -f "$sock_file"
+      eval "$(ssh-agent -a "$sock_file" 2>/dev/null)" >/dev/null
+    fi
+  fi
+}
+command -v ssh-agent >/dev/null 2>&1 && command -v ssh-add >/dev/null 2>&1 && _setup_ssh_agent
+unset -f _setup_ssh_agent

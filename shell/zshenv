@@ -44,7 +44,13 @@ if [[ "${HOST:-localhost}" == "localhost" || -z "${HOST:-}" ]]; then
     export HOST="$(<"$HOME/.hostname")"
   elif (( $+commands[getprop] )); then
     _dev="$(getprop ro.product.model 2>/dev/null || getprop ro.product.device 2>/dev/null)"
-    [[ -n "$_dev" ]] && export HOST="$(echo "$_dev" | tr '[:upper:] ' '[:lower:]-' | tr -cd '[:alnum:]-_')"
+    [[ -n "$_dev" ]] && export HOST="${${(L)_dev// /-}//[^a-z0-9-_]/}"
     unset _dev
   fi
+fi
+
+# On Termux / Android, point SSH_AUTH_SOCK to the shared agent socket so all
+# subshells, scripts, and Emacs child processes share the same agent.
+if [[ -z "${SSH_AUTH_SOCK-}" && ( -n "${TERMUX_VERSION-}" || "$OSTYPE" == linux-android* || -d "/data/data/com.termux" ) ]]; then
+  export SSH_AUTH_SOCK="$HOME/.ssh/ssh-agent.sock"
 fi
