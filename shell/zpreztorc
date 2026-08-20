@@ -3,7 +3,9 @@
 #
 
 # Set case-sensitivity for completion, history lookup, etc.
-# zstyle ':prezto:*:*' case-sensitive 'yes'
+# Note: Leaving this unset causes Prezto completion module to run 'unsetopt CASE_GLOB'
+# (nocaseglob), which breaks absolute extended globbing (-/FN) inside Termux/Android.
+zstyle ':prezto:*:*' case-sensitive 'yes'
 
 # Color output (auto set to 'no' on dumb terminals).
 zstyle ':prezto:*:*' color 'yes'
