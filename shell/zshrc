@@ -9,7 +9,6 @@
 if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
   setopt FUNCTION_ARGZERO CASE_GLOB
   export ZPREZTODIR="${ZDOTDIR:-$HOME}/.zprezto"
-  zstyle ':prezto:load' pmodule-dirs "${ZDOTDIR:-$HOME}/.zprezto/modules" "${ZDOTDIR:-$HOME}/.zprezto/contrib"
   source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
 fi
 
