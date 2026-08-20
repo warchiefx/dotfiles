@@ -1,0 +1,8 @@
+# source                target                  platform
+#
+# ghostty reads $XDG_CONFIG_HOME/ghostty on macOS as well as Linux, so ~/.ghostty
+# would simply never be read -- this is the case that used to need the
+# XDG_DOTFILES list.
+ghostty                 $XDG_CONFIG_HOME/ghostty
+termite                 $XDG_CONFIG_HOME/termite       linux
+Xresources              ~/.Xresources                  linux

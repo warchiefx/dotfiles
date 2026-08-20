@@ -1,0 +1,4 @@
+# source                target                  platform
+eslintrc                ~/.eslintrc
+eslintrc.js             ~/.eslintrc.js
+tern-config             ~/.tern-config

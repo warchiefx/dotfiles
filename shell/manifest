@@ -1,0 +1,9 @@
+# source                target                  platform
+#
+# Whitespace-separated. `platform' is optional: linux, macos, or omitted for
+# both. ~ and $XDG_CONFIG_HOME are expanded; nothing else is.
+zshrc                   ~/.zshrc
+zshenv                  ~/.zshenv
+zprofile                ~/.zprofile
+zpreztorc               ~/.zpreztorc
+profile                 ~/.profile

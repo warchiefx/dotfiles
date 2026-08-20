@@ -6,16 +6,23 @@
 # files themselves: zshrc sources prezto and is inert without it, tmux.conf
 # expects tpm, and mosh needs a PATH that non-interactive ssh shells can see.
 #
+# The files are grouped by feature, one directory each, and every group carries a
+# `manifest' saying where its files belong and which platforms want them. Nothing
+# is linked unless a manifest declares it, so adding a file to this repository
+# does not silently put something in $HOME.
+#
 # Deliberately self-contained. It resolves its own directory rather than a path
 # relative to any other checkout, so it runs on a machine that has these
 # dotfiles and nothing else.
 #
 # Usage:
-#   ./setup                 # everything below
-#   ./setup --list          # report what would change, do nothing
-#   ./setup --link-only     # just the symlinks
-#   ./setup --no-mosh       # skip installing mosh
-#   ./setup --no-chsh       # leave the login shell alone
+#   ./setup                      # everything below
+#   ./setup --list               # report what would change, do nothing
+#   ./setup --only shell --only tmux   # just these features
+#   ./setup --skip js            # everything but these
+#   ./setup --link-only          # symlinks, no prezto/tpm/mosh
+#   ./setup --no-mosh            # skip installing mosh
+#   ./setup --no-chsh            # leave the login shell alone
 
 set -euo pipefail
 
@@ -26,31 +33,20 @@ TPM_REPO="${TPM_REPO:-https://github.com/tmux-plugins/tpm.git}"
 TPM_DIR="${TPM_DIR:-$HOME/.tmux/plugins/tpm}"
 XDG_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-# Entries here live under $XDG_CONFIG_HOME keeping their own name, rather than
-# becoming a dotfile in $HOME. ghostty reads ~/.config/ghostty on macOS too, so
-# linking it to ~/.ghostty would leave it unread.
-XDG_DOTFILES=(
-  "ghostty"
-)
-
-# Names in this directory that are not dotfiles. `setup` is in here for a
-# concrete reason: this script sits inside the directory it enumerates, so
-# without the exclusion it would cheerfully symlink itself to ~/.setup.
-NOT_A_DOTFILE=(
-  "setup"
-  ".git" ".gitignore" ".gitmodules" ".gitattributes" ".DS_Store"
-)
-
 DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1
-for arg in "$@"; do
-  case "$arg" in
+ONLY=() SKIP=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --list)      DO_LIST=1 ;;
     --link-only) DO_LINK_ONLY=1 ;;
     --no-mosh)   DO_MOSH=0 ;;
     --no-chsh)   DO_CHSH=0 ;;
+    --only)      shift; [[ $# -gt 0 ]] || { echo "--only needs a feature name" >&2; exit 2; }; ONLY+=("$1") ;;
+    --skip)      shift; [[ $# -gt 0 ]] || { echo "--skip needs a feature name" >&2; exit 2; }; SKIP+=("$1") ;;
     -h|--help)   awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
-    *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
+    *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
   esac
+  shift
 done
 
 installed=() skipped=() failed=()
@@ -58,58 +54,83 @@ installed=() skipped=() failed=()
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # ---------------------------------------------------------------------------
-# Which files are dotfiles, and where each one belongs
+# Features and their manifests
+#
+# A feature is any directory here holding a `manifest'. That is the whole
+# registry: no list to keep in step with the filesystem, and the transitional
+# symlinks left at the old flat paths are ignored for free, since a symlink at
+# the top level is not a directory with a manifest in it.
 # ---------------------------------------------------------------------------
 
-is_xdg_dotfile() {
-  local candidate="$1" name
-  for name in "${XDG_DOTFILES[@]}"; do
-    [[ "$name" == "$candidate" ]] && return 0
-  done
-  return 1
-}
-
-is_excluded() {
-  local candidate="$1" name
-  for name in "${NOT_A_DOTFILE[@]}"; do
-    [[ "$name" == "$candidate" ]] && return 0
-  done
-  case "$candidate" in
-    .|..|README*|LICENSE*|COPYING*|INSTALL*) return 0 ;;
+this_platform() {
+  case "$(uname -s)" in
+    Darwin) echo macos ;;
+    Linux)  echo linux ;;
+    *)      echo other ;;
   esac
+}
+PLATFORM="$(this_platform)"
+
+feature_list() {
+  local path
+  for path in "$DOTFILES_DIR"/*/manifest; do
+    [[ -f "$path" ]] || continue
+    basename "$(dirname "$path")"
+  done | sort
+}
+
+feature_exists() {
+  local candidate="$1" name
+  while read -r name; do
+    [[ "$name" == "$candidate" ]] && return 0
+  done < <(feature_list)
   return 1
 }
 
-dotfiles_list() {
-  local item name
-  for item in "$DOTFILES_DIR"/* "$DOTFILES_DIR"/.*; do
-    [[ -e "$item" || -L "$item" ]] || continue
-    name="$(basename "$item")"
-    is_excluded "$name" && continue
-    is_xdg_dotfile "$name" && continue
-    printf '%s\n' "$name"
-  done | sort -u
-}
-
-# The XDG entries this checkout actually carries, in declared order.
-xdg_dotfiles_list() {
-  local name
-  for name in "${XDG_DOTFILES[@]}"; do
-    [[ -e "$DOTFILES_DIR/$name" || -L "$DOTFILES_DIR/$name" ]] || continue
-    printf '%s\n' "$name"
+in_list() {
+  local needle="$1"; shift
+  local item
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
   done
+  return 1
 }
 
-dotfile_target() {
-  local name="$1"
-  if is_xdg_dotfile "$name"; then
-    printf '%s/%s\n' "$XDG_CONFIG_DIR" "$name"
-  elif [[ "$name" == .* ]]; then
-    printf '%s/%s\n' "$HOME" "$name"
-  else
-    printf '%s/.%s\n' "$HOME" "$name"
-  fi
+# Features to act on, after --only and --skip. --only wins where both name the
+# same feature, on the grounds that the narrower flag is the more deliberate one.
+selected_features() {
+  local name
+  while read -r name; do
+    if [[ ${#ONLY[@]} -gt 0 ]]; then
+      in_list "$name" "${ONLY[@]}" || continue
+    elif [[ ${#SKIP[@]} -gt 0 ]] && in_list "$name" "${SKIP[@]}"; then
+      continue
+    fi
+    printf '%s\n' "$name"
+  done < <(feature_list)
 }
+
+# Emits "source<TAB>target<TAB>platform" for each declared entry, target already
+# expanded. Comments and blank lines are dropped; a missing platform means both.
+manifest_entries() {
+  local feature="$1" src target platform
+  while read -r src target platform; do
+    [[ -n "$src" ]] || continue
+    [[ "$src" == \#* ]] && continue
+    target="${target/#\~/$HOME}"
+    target="${target//\$XDG_CONFIG_HOME/$XDG_CONFIG_DIR}"
+    printf '%s\t%s\t%s\n' "$src" "$target" "${platform:-any}"
+  done < "$DOTFILES_DIR/$feature/manifest"
+}
+
+wanted_here() {
+  local platform="$1"
+  [[ "$platform" == "any" || "$platform" == "$PLATFORM" ]]
+}
+
+# ---------------------------------------------------------------------------
+# Linking
+# ---------------------------------------------------------------------------
 
 # What to call it in the output: relative to $HOME where it is under it, so
 # .zshrc stays .zshrc and ghostty reads .config/ghostty.
@@ -180,30 +201,28 @@ link_dotfile() {
   fi
 }
 
-symlink_dotfiles() {
-  echo
-  echo "--- dotfiles (symlinking into $HOME) ---"
-  local files xdg_files name target
-  files="$(dotfiles_list)"
-  xdg_files="$(xdg_dotfiles_list)"
-  if [[ -z "$files" && -z "$xdg_files" ]]; then
-    echo "  skipped -- nothing to link"
-    return 0
-  fi
-  while read -r name; do
-    [[ -n "$name" ]] || continue
-    target="$(dotfile_target "$name")"
-    link_dotfile "$DOTFILES_DIR/$name" "$target" "$(dotfile_label "$target")"
-  done <<<"$files"
-  # $XDG_CONFIG_HOME need not exist yet on a fresh machine.
-  if [[ -n "$xdg_files" ]]; then
-    mkdir -p "$XDG_CONFIG_DIR"
-    while read -r name; do
-      [[ -n "$name" ]] || continue
-      target="$(dotfile_target "$name")"
-      link_dotfile "$DOTFILES_DIR/$name" "$target" "$(dotfile_label "$target")"
-    done <<<"$xdg_files"
-  fi
+symlink_features() {
+  local feature src target platform source
+  while read -r feature; do
+    echo
+    echo "--- $feature ---"
+    while IFS=$'\t' read -r src target platform; do
+      if ! wanted_here "$platform"; then
+        echo "  skipped $(dotfile_label "$target") (for $platform, this is $PLATFORM)"
+        skipped+=("dotfile:$src")
+        continue
+      fi
+      source="$DOTFILES_DIR/$feature/$src"
+      if [[ ! -e "$source" ]]; then
+        echo "  FAILED  $feature/manifest declares $src, which is not here" >&2
+        failed+=("dotfile:$src")
+        continue
+      fi
+      # $XDG_CONFIG_HOME and any other parent need not exist yet.
+      mkdir -p "$(dirname "$target")"
+      link_dotfile "$source" "$target" "$(dotfile_label "$target")"
+    done < <(manifest_entries "$feature")
+  done < <(selected_features)
 }
 
 # ---------------------------------------------------------------------------
@@ -211,8 +230,8 @@ symlink_dotfiles() {
 # ---------------------------------------------------------------------------
 
 ensure_prezto() {
-  # zshrc sources ${ZDOTDIR:-$HOME}/.zprezto/init.zsh; without it the prompt,
-  # completions and modules that zshrc assumes simply are not there.
+  # shell/zshrc sources ${ZDOTDIR:-$HOME}/.zprezto/init.zsh; without it the
+  # prompt, completions and modules that zshrc assumes are simply not there.
   if [[ -e "$ZPREZTO_DIR" ]]; then
     echo "  ok      zprezto (found $ZPREZTO_DIR)"
     skipped+=("zprezto")
@@ -329,11 +348,11 @@ install_mosh() {
   fi
 
   # The check that matters. mosh starts its server through a *non-interactive*
-  # ssh command -- roughly `ssh host mosh-server new` -- and zsh reads only
+  # ssh command -- roughly `ssh host mosh-server new' -- and zsh reads only
   # ~/.zshenv for one of those, never .zprofile. On Apple Silicon the PATH such
   # a shell gets is /bin:/usr/bin:/usr/ucb:/usr/local/bin, with no
-  # /opt/homebrew/bin in it, so `mosh host` reports "mosh-server not found" on a
-  # machine where mosh is plainly installed. zshenv in here exists to fix that,
+  # /opt/homebrew/bin in it, so `mosh host' reports "mosh-server not found" on a
+  # machine where mosh is plainly installed. shell/zshenv exists to fix that,
   # which makes this a check on whether it is linked.
   if ! have zsh; then
     echo "  note    zsh absent, so ~/.zshenv is not the relevant path here"
@@ -356,7 +375,7 @@ install_mosh() {
 # ---------------------------------------------------------------------------
 
 print_inventory() {
-  local name target status
+  local feature src target platform status
   echo "== login shell =="
   if have zsh; then
     status="$([[ "${SHELL:-}" == "$(command -v zsh)" ]] && echo present || echo "MISSING (is ${SHELL:-unset})")"
@@ -374,26 +393,39 @@ print_inventory() {
   printf '  %-24s %s\n' "mosh" \
     "$(have mosh-server && echo present || echo MISSING)"
 
-  echo
-  echo "== dotfiles =="
-  local files
-  files="$(dotfiles_list; xdg_dotfiles_list)"
-  if [[ -n "$files" ]]; then
-    while read -r name; do
-      [[ -n "$name" ]] || continue
-      target="$(dotfile_target "$name")"
-      printf '  %-24s -> %-16s %s\n' \
-        "$(dotfile_label "$target")" "$name" \
-        "$(dotfile_status "$DOTFILES_DIR/$name" "$target")"
-    done <<<"$files"
-  fi
+  while read -r feature; do
+    echo
+    echo "== $feature =="
+    while IFS=$'\t' read -r src target platform; do
+      if wanted_here "$platform"; then
+        printf '  %-24s -> %-16s %s\n' \
+          "$(dotfile_label "$target")" "$src" \
+          "$(dotfile_status "$DOTFILES_DIR/$feature/$src" "$target")"
+      else
+        printf '  %-24s -> %-16s %s\n' \
+          "$(dotfile_label "$target")" "$src" "skipped ($platform only)"
+      fi
+    done < <(manifest_entries "$feature")
+  done < <(selected_features)
 }
 
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
-echo "==> dotfiles setup ($DOTFILES_DIR)"
+# A typo in a feature name should stop the run, not silently do nothing at all
+# (--only) or everything (--skip).
+# The ${a[@]+...} form is deliberate: under `set -u' bash 3.2, which is what
+# macOS ships, expanding an empty array is an unbound-variable error.
+for name in ${ONLY[@]+"${ONLY[@]}"} ${SKIP[@]+"${SKIP[@]}"}; do
+  if ! feature_exists "$name"; then
+    echo "no such feature: $name" >&2
+    echo "available: $(feature_list | tr '\n' ' ')" >&2
+    exit 2
+  fi
+done
+
+echo "==> dotfiles setup ($DOTFILES_DIR, $PLATFORM)"
 
 if [[ $DO_LIST -eq 1 ]]; then
   echo
@@ -401,7 +433,7 @@ if [[ $DO_LIST -eq 1 ]]; then
   exit 0
 fi
 
-symlink_dotfiles
+symlink_features
 
 if [[ $DO_LINK_ONLY -eq 0 ]]; then
   echo
@@ -412,7 +444,7 @@ if [[ $DO_LINK_ONLY -eq 0 ]]; then
   fi
 
   echo
-  echo "--- tmux ---"
+  echo "--- tmux plugins ---"
   ensure_tpm
 
   if [[ $DO_MOSH -eq 1 ]]; then

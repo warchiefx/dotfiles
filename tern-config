@@ -1,16 +1,1 @@
- {
-   "libs": [
-     "browser",
-     "react"
-   ],
-   "plugins": {
-     "doc_comment": {},
-     "node": {},
-     "requirejs": {
-       "baseURL": "./",
-       "paths": {}
-     },
-     "commonjs": {},
-     "webpack": {}
-   }
- }
+js/tern-config

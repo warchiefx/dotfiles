@@ -13,25 +13,69 @@ git clone https://github.com/warchiefx/dotfiles.git ~/dotfiles
 
 `setup` owns the whole environment, not just the files — `zshrc` sources prezto
 and is inert without it, `tmux.conf` expects tpm, and mosh needs a `PATH` that
-non-interactive ssh shells can actually see. So it:
-
-- symlinks everything here into `$HOME`, prefixing a dot where there isn't one,
-  and backs up anything already in the way
-- puts the entries listed in `XDG_DOTFILES` under `$XDG_CONFIG_HOME` keeping
-  their own name, because `~/.ghostty` is not a path ghostty reads
-- clones prezto into `~/.zprezto`
-- `chsh`es the login shell to zsh
-- installs tpm and its tmux plugins
-- installs mosh, then checks the thing that actually breaks it
+non-interactive ssh shells can actually see. So it links the files, clones prezto
+into `~/.zprezto`, `chsh`es the login shell to zsh, installs tpm and its tmux
+plugins, and installs mosh — then checks the thing that actually breaks mosh.
 
 ```bash
 ./setup --list                 # report what would change, do nothing
+./setup --only shell --only tmux
+./setup --skip js
 ./setup --link-only            # just the symlinks
 ./setup --no-mosh --no-chsh    # skip mosh / leave the login shell alone
 ```
 
+## Layout
+
+The files are grouped by feature, one directory each:
+
+```
+shell/     zshrc zshenv zprofile zpreztorc profile
+tmux/      tmux.conf
+git/       gitconfig
+terminal/  ghostty/ termite/ Xresources
+python/    pycodestyle.cfg pylintrc
+js/        eslintrc eslintrc.js tern-config
+```
+
+A feature is any directory holding a `manifest`. That is the whole registry —
+there is no list to keep in step with the filesystem, and `--only` / `--skip`
+take those names.
+
+A manifest says where each file belongs and which platforms want it:
+
+```
+# source      target                     platform
+zshrc         ~/.zshrc
+ghostty       $XDG_CONFIG_HOME/ghostty
+Xresources    ~/.Xresources              linux
+```
+
+`~` and `$XDG_CONFIG_HOME` are expanded; nothing else is. An omitted platform
+means both. Two things follow from targets being written out rather than derived
+from filenames: `ghostty` can land in `~/.config` where ghostty actually reads it,
+and X11-only files stop being linked on macOS where nothing reads them.
+
+**Nothing is linked unless a manifest declares it.** Adding a file to this
+repository does not silently put something in `$HOME`, and there is no exclusion
+list to maintain for READMEs, licences and the script itself.
+
 It is self-contained: it resolves its own directory, so it does not care where
 this repository is checked out or what else is on the machine.
+
+## Transitional symlinks (remove next release)
+
+The top level still carries a symlink for each file at its old flat path —
+`zshrc -> shell/zshrc` and so on. They exist only so a machine that pulls the
+feature split *before* re-running `setup` keeps working: its `~/.zshrc` still
+points at `dotfiles/zshrc`, which now resolves one hop further.
+
+`setup` ignores them, since a feature is a directory with a manifest. Once every
+machine has re-run it, delete them:
+
+```bash
+./setup --list | grep relink    # any machine still on the old paths?
+```
 
 ## Two things worth knowing
 

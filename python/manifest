@@ -1,0 +1,3 @@
+# source                target                  platform
+pycodestyle.cfg         ~/.pycodestyle.cfg
+pylintrc                ~/.pylintrc
