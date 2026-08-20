@@ -7,6 +7,7 @@
 
 # Source Prezto.
 if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
+  export ZPREZTODIR="${ZDOTDIR:-$HOME}/.zprezto"
   source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
 fi
 

@@ -263,7 +263,14 @@ ensure_prezto() {
     echo "  ok      zprezto (found $ZPREZTO_DIR)"
     if [[ -d "$ZPREZTO_DIR/.git" ]]; then
       echo "  sync    zprezto submodules"
-      git -C "$ZPREZTO_DIR" submodule update --init --recursive 2>/dev/null || true
+      git -C "$ZPREZTO_DIR" submodule sync --recursive 2>/dev/null || true
+      if ! git -C "$ZPREZTO_DIR" submodule update --init --recursive; then
+        echo "  WARNING zprezto submodule sync had errors. If modules fail to load," >&2
+        echo "          remove and re-clone with: rm -rf $ZPREZTO_DIR && $0" >&2
+      fi
+    else
+      echo "  WARNING $ZPREZTO_DIR is not a git repository." >&2
+      echo "          Re-clone with: rm -rf $ZPREZTO_DIR && $0" >&2
     fi
     skipped+=("zprezto")
     return 0
