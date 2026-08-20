@@ -82,12 +82,22 @@ alias m=mark
 
 # Clean prompt with git status
 setopt prompt_subst
+
+# Ensure VCS_Info backend directories are in fpath
+for _dir in ${^fpath}/VCS_Info(N/) ${^fpath}/VCS_Info/Backends(N/); do
+  fpath=($_dir $fpath)
+done
+unset _dir
+
 autoload -Uz vcs_info
+autoload -Uz VCS_INFO_get_data_git VCS_INFO_detect_git 2>/dev/null || true
+(( $+functions[vcs_info_setsys] )) && vcs_info_setsys
+
 zstyle ':vcs_info:*' enable git
 zstyle ':vcs_info:git:*' formats '%F{242}on%f %F{magenta}%b%f '
 zstyle ':vcs_info:git:*' actionformats '%F{242}on%f %F{magenta}%b%f|%F{red}%a%f '
 precmd() {
-  vcs_info
+  vcs_info >/dev/null 2>&1 || true
 }
 PROMPT='%F{green}%m%f %F{cyan}%~%f ${vcs_info_msg_0_}%F{yellow}❯%f '
 
