@@ -24,6 +24,7 @@
 #   ./setup --no-packages        # skip installing Termux packages
 #   ./setup --no-mosh            # skip installing mosh
 #   ./setup --no-chsh            # leave the login shell alone
+#   ./setup --hostname <name>    # set machine name for prompt (~/.hostname)
 
 set -euo pipefail
 
@@ -35,6 +36,7 @@ TPM_DIR="${TPM_DIR:-$HOME/.tmux/plugins/tpm}"
 XDG_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1 DO_PACKAGES=1
+CUSTOM_HOSTNAME=""
 ONLY=() SKIP=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,9 +45,10 @@ while [[ $# -gt 0 ]]; do
     --no-packages) DO_PACKAGES=0 ;;
     --no-mosh)     DO_MOSH=0 ;;
     --no-chsh)     DO_CHSH=0 ;;
-    --only)      shift; [[ $# -gt 0 ]] || { echo "--only needs a feature name" >&2; exit 2; }; ONLY+=("$1") ;;
-    --skip)      shift; [[ $# -gt 0 ]] || { echo "--skip needs a feature name" >&2; exit 2; }; SKIP+=("$1") ;;
-    -h|--help)   awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --hostname|-H) shift; [[ $# -gt 0 ]] || { echo "--hostname needs a name" >&2; exit 2; }; CUSTOM_HOSTNAME="$1" ;;
+    --only)        shift; [[ $# -gt 0 ]] || { echo "--only needs a feature name" >&2; exit 2; }; ONLY+=("$1") ;;
+    --skip)        shift; [[ $# -gt 0 ]] || { echo "--skip needs a feature name" >&2; exit 2; }; SKIP+=("$1") ;;
+    -h|--help)     awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
   esac
   shift
@@ -477,6 +480,32 @@ ensure_termux_packages() {
   fi
 }
 
+ensure_hostname() {
+  local target="$HOME/.hostname" chosen_host="" default_host=""
+  if [[ -n "${CUSTOM_HOSTNAME:-}" ]]; then
+    chosen_host="$CUSTOM_HOSTNAME"
+  elif [[ "$PLATFORM" == "termux" && ! -e "$target" ]]; then
+    default_host="$(getprop ro.product.model 2>/dev/null || getprop ro.product.device 2>/dev/null || echo "tablet")"
+    default_host="$(echo "$default_host" | tr '[:upper:] ' '[:lower:]-' | tr -cd '[:alnum:]-_')"
+    default_host="${default_host:-tablet}"
+    if [[ -t 0 ]]; then
+      read -r -p "  hostname for prompt [$default_host]: " chosen_host || true
+      chosen_host="${chosen_host:-$default_host}"
+    else
+      chosen_host="$default_host"
+    fi
+  fi
+
+  if [[ -n "$chosen_host" ]]; then
+    echo "$chosen_host" > "$target"
+    echo "  hostname $chosen_host (saved in ~/.hostname)"
+    installed+=("hostname:$chosen_host")
+  elif [[ -e "$target" ]]; then
+    echo "  ok      hostname ($(cat "$target"))"
+    skipped+=("hostname")
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
@@ -502,6 +531,8 @@ if [[ $DO_LIST -eq 1 ]]; then
 fi
 
 symlink_features
+
+ensure_hostname
 
 if [[ $DO_LINK_ONLY -eq 0 ]]; then
   if [[ "$PLATFORM" == "termux" && $DO_PACKAGES -eq 1 ]]; then

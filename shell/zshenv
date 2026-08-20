@@ -36,3 +36,15 @@ unset _brew
 [[ -n "${PREFIX-}" && -d "$PREFIX/bin" ]] && path=($PREFIX/bin $PREFIX/bin/applets $path)
 [[ -d $HOME/.cargo/bin ]] && path=($HOME/.cargo/bin $path)
 [[ -d $HOME/.local/bin ]] && path=($HOME/.local/bin $path)
+
+# On systems where hostname defaults to generic localhost (such as Android/Termux),
+# resolve from ~/.hostname or Android device model properties.
+if [[ "${HOST:-localhost}" == "localhost" || -z "${HOST:-}" ]]; then
+  if [[ -r "$HOME/.hostname" ]]; then
+    export HOST="$(<"$HOME/.hostname")"
+  elif (( $+commands[getprop] )); then
+    _dev="$(getprop ro.product.model 2>/dev/null || getprop ro.product.device 2>/dev/null)"
+    [[ -n "$_dev" ]] && export HOST="$(echo "$_dev" | tr '[:upper:] ' '[:lower:]-' | tr -cd '[:alnum:]-_')"
+    unset _dev
+  fi
+fi
