@@ -119,6 +119,13 @@ manifest_entries() {
     [[ "$src" == \#* ]] && continue
     target="${target/#\~/$HOME}"
     target="${target//\$XDG_CONFIG_HOME/$XDG_CONFIG_DIR}"
+    # A target that did not expand to an absolute path is a manifest typo, and a
+    # silently relative one is the worst outcome: `mkdir -p' would create the
+    # literal directory next to wherever the script was invoked from. Refuse it.
+    if [[ "$target" != /* ]]; then
+      printf '%s\t%s\tBAD\n' "$src" "$target"
+      continue
+    fi
     printf '%s\t%s\t%s\n' "$src" "$target" "${platform:-any}"
   done < "$DOTFILES_DIR/$feature/manifest"
 }
@@ -207,6 +214,11 @@ symlink_features() {
     echo
     echo "--- $feature ---"
     while IFS=$'\t' read -r src target platform; do
+      if [[ "$platform" == "BAD" ]]; then
+        echo "  FAILED  $feature/manifest: target '$target' for $src is not an absolute path" >&2
+        failed+=("manifest:$feature")
+        continue
+      fi
       if ! wanted_here "$platform"; then
         echo "  skipped $(dotfile_label "$target") (for $platform, this is $PLATFORM)"
         skipped+=("dotfile:$src")
@@ -397,6 +409,10 @@ print_inventory() {
     echo
     echo "== $feature =="
     while IFS=$'\t' read -r src target platform; do
+      if [[ "$platform" == "BAD" ]]; then
+        printf '  %-24s -> %-16s %s\n' "$target" "$src" "BAD (not an absolute path)"
+        continue
+      fi
       if wanted_here "$platform"; then
         printf '  %-24s -> %-16s %s\n' \
           "$(dotfile_label "$target")" "$src" \

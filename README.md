@@ -51,8 +51,10 @@ ghostty       $XDG_CONFIG_HOME/ghostty
 Xresources    ~/.Xresources              linux
 ```
 
-`~` and `$XDG_CONFIG_HOME` are expanded; nothing else is. An omitted platform
-means both. Two things follow from targets being written out rather than derived
+`~` and `$XDG_CONFIG_HOME` are expanded; nothing else is, and a target that does
+not come out absolute is refused rather than acted on — a relative one would make
+`mkdir -p` create the literal directory next to wherever `setup` was invoked
+from. An omitted platform means both. Two things follow from targets being written out rather than derived
 from filenames: `ghostty` can land in `~/.config` where ghostty actually reads it,
 and X11-only files stop being linked on macOS where nothing reads them.
 
