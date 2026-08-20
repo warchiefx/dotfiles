@@ -90,7 +90,7 @@ zstyle ':vcs_info:git:*' actionformats '%F{242}on%f %F{magenta}%b%f|%F{red}%a%f 
 precmd() {
   vcs_info
 }
-PROMPT='%F{cyan}%~%f ${vcs_info_msg_0_}%F{yellow}❯%f '
+PROMPT='%F{green}%m%f %F{cyan}%~%f ${vcs_info_msg_0_}%F{yellow}❯%f '
 
 function copy_tmux_conf {
     if [ $# -eq 0 ]
