@@ -22,6 +22,7 @@ plugins, and installs mosh — then checks the thing that actually breaks mosh.
 ./setup --only shell --only tmux
 ./setup --skip js
 ./setup --link-only            # just the symlinks
+./setup --no-packages          # skip Termux package install
 ./setup --no-mosh --no-chsh    # skip mosh / leave the login shell alone
 ```
 
@@ -34,6 +35,7 @@ shell/     zshrc zshenv zprofile zpreztorc
 tmux/      tmux.conf
 git/       gitconfig
 terminal/  ghostty/ termite/ Xresources
+termux/    termux.properties font.ttf install-essentials
 python/    pycodestyle.cfg pylintrc
 js/        eslintrc eslintrc.js tern-config
 ```
@@ -65,21 +67,7 @@ list to maintain for READMEs, licences and the script itself.
 It is self-contained: it resolves its own directory, so it does not care where
 this repository is checked out or what else is on the machine.
 
-## Transitional symlinks (remove next release)
-
-The top level still carries a symlink for each file at its old flat path —
-`zshrc -> shell/zshrc` and so on. They exist only so a machine that pulls the
-feature split *before* re-running `setup` keeps working: its `~/.zshrc` still
-points at `dotfiles/zshrc`, which now resolves one hop further.
-
-`setup` ignores them, since a feature is a directory with a manifest. Once every
-machine has re-run it, delete them:
-
-```bash
-./setup --list | grep relink    # any machine still on the old paths?
-```
-
-## Two things worth knowing
+## Three things worth knowing
 
 **`TERM` is never set here.** The terminal emulator is the only thing that knows
 what it can do, and tmux rewrites `TERM` for its panes, so exporting a value from
@@ -93,6 +81,13 @@ non-interactive, non-login shell, and zsh reads only `.zshenv` for one — never
 `.zprofile`, where the interactive setup lives. Without it `mosh host` fails with
 "mosh-server not found" on a machine where mosh is installed, and a remote `qs` or
 `claude` cannot be found either.
+
+**`termux` on Android.** When running in Termux on Android, `setup` links
+`~/.termux/termux.properties` (modern defaults with disabled extra-keys toolbar)
+and `~/.termux/font.ttf` (Iosevka Term font), reloads settings, and installs
+packages via `termux/install-essentials` (python, mosh, tmux, zsh, vim, uv,
+termux-api, nodejs, wget, curl, openssh, gh). `termux/install-essentials` can
+also be run standalone.
 
 ## Tests
 

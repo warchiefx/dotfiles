@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+#
+# install-essentials — install essential packages for the Termux environment.
+#
+# Usage:
+#   ./install-essentials
+#   FORCE=1 ./install-essentials   # bypass Termux environment check
+#
+
+set -euo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+is_termux() {
+  [[ -n "${TERMUX_VERSION:-}" || "${PREFIX:-}" == *"/com.termux/"* || -d "/data/data/com.termux" ]] || [[ "$(uname -o 2>/dev/null)" == "Android" ]]
+}
+
+FORCE_FLAG="${FORCE:-0}"
+for arg in "$@"; do
+  case "$arg" in
+    -f|--force) FORCE_FLAG=1 ;;
+    -h|--help)  awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
+  esac
+done
+
+if ! is_termux && [[ "$FORCE_FLAG" -ne 1 ]]; then
+  echo "WARNING: Not running in a Termux environment." >&2
+  echo "This script is intended for Termux on Android." >&2
+  echo "Set FORCE=1 or pass --force to run anyway." >&2
+  exit 1
+fi
+
+if ! have pkg; then
+  echo "ERROR: 'pkg' command not found. Please run within Termux or install Termux packages." >&2
+  exit 1
+fi
+
+echo "==> Updating Termux package lists..."
+pkg update -y
+
+PACKAGES=(
+  python
+  mosh
+  tmux
+  zsh
+  vim
+  termux-api
+  nodejs
+  wget
+  curl
+  openssh
+  gh
+)
+
+echo "==> Installing essential Termux packages..."
+echo "    ${PACKAGES[*]}"
+pkg install -y "${PACKAGES[@]}"
+
+echo "==> Setting up uv (Python package manager)..."
+if have uv; then
+  echo "  ok      uv (found $(command -v uv))"
+else
+  # Try official astral install script, then python -m pip
+  if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
+    echo "  ok      uv installed via astral install script"
+  elif python3 -m pip install uv --break-system-packages 2>/dev/null || python -m pip install uv --break-system-packages 2>/dev/null || pip install uv --break-system-packages 2>/dev/null; then
+    echo "  ok      uv installed via pip"
+  else
+    echo "  note    uv binary not available for this Android/Termux architecture yet;"
+    echo "          standard python & pip are available."
+  fi
+fi
+
+echo
+echo "==> Termux essentials installed successfully."

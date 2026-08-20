@@ -1,0 +1,3 @@
+# source                target                          platform
+termux.properties       ~/.termux/termux.properties     termux
+font.ttf                ~/.termux/font.ttf              termux

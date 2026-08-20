@@ -20,7 +20,8 @@
 #   ./setup --list               # report what would change, do nothing
 #   ./setup --only shell --only tmux   # just these features
 #   ./setup --skip js            # everything but these
-#   ./setup --link-only          # symlinks, no prezto/tpm/mosh
+#   ./setup --link-only          # symlinks, no prezto/tpm/mosh/packages
+#   ./setup --no-packages        # skip installing Termux packages
 #   ./setup --no-mosh            # skip installing mosh
 #   ./setup --no-chsh            # leave the login shell alone
 
@@ -33,14 +34,15 @@ TPM_REPO="${TPM_REPO:-https://github.com/tmux-plugins/tpm.git}"
 TPM_DIR="${TPM_DIR:-$HOME/.tmux/plugins/tpm}"
 XDG_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1
+DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1 DO_PACKAGES=1
 ONLY=() SKIP=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --list)      DO_LIST=1 ;;
-    --link-only) DO_LINK_ONLY=1 ;;
-    --no-mosh)   DO_MOSH=0 ;;
-    --no-chsh)   DO_CHSH=0 ;;
+    --list)        DO_LIST=1 ;;
+    --link-only)   DO_LINK_ONLY=1 ;;
+    --no-packages) DO_PACKAGES=0 ;;
+    --no-mosh)     DO_MOSH=0 ;;
+    --no-chsh)     DO_CHSH=0 ;;
     --only)      shift; [[ $# -gt 0 ]] || { echo "--only needs a feature name" >&2; exit 2; }; ONLY+=("$1") ;;
     --skip)      shift; [[ $# -gt 0 ]] || { echo "--skip needs a feature name" >&2; exit 2; }; SKIP+=("$1") ;;
     -h|--help)   awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
@@ -63,11 +65,15 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # ---------------------------------------------------------------------------
 
 this_platform() {
-  case "$(uname -s)" in
-    Darwin) echo macos ;;
-    Linux)  echo linux ;;
-    *)      echo other ;;
-  esac
+  if [[ -n "${TERMUX_VERSION:-}" || "${PREFIX:-}" == *"/com.termux/"* || -d "/data/data/com.termux" ]] || [[ "$(uname -o 2>/dev/null)" == "Android" ]]; then
+    echo termux
+  else
+    case "$(uname -s)" in
+      Darwin) echo macos ;;
+      Linux)  echo linux ;;
+      *)      echo other ;;
+    esac
+  fi
 }
 PLATFORM="$(this_platform)"
 
@@ -235,6 +241,12 @@ symlink_features() {
       link_dotfile "$source" "$target" "$(dotfile_label "$target")"
     done < <(manifest_entries "$feature")
   done < <(selected_features)
+
+  if [[ "$PLATFORM" == "termux" ]] && have termux-reload-settings; then
+    echo
+    echo "  reload  termux settings"
+    termux-reload-settings || true
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -273,16 +285,20 @@ ensure_login_shell() {
     return 0
   fi
   # chsh refuses a shell that is not listed in /etc/shells, and the error is
-  # obscure enough to be worth pre-empting.
-  if [[ -r /etc/shells ]] && ! grep -qxF "$zsh_path" /etc/shells; then
+  # obscure enough to be worth pre-empting (Termux does not use /etc/shells).
+  if [[ "$PLATFORM" != "termux" && -r /etc/shells ]] && ! grep -qxF "$zsh_path" /etc/shells; then
     echo "  SKIPPED -- $zsh_path is not in /etc/shells, so chsh would refuse it." >&2
     echo "             Add it (needs sudo), then re-run:" >&2
     echo "               echo $zsh_path | sudo tee -a /etc/shells" >&2
     failed+=("login-shell")
     return 0
   fi
-  # Prompts for a password, which is why this is not silent and not sudo.
-  echo "  chsh    $current -> $zsh_path (will ask for your password)"
+  # Prompts for a password on desktop/server, but not in Termux.
+  if [[ "$PLATFORM" == "termux" ]]; then
+    echo "  chsh    $current -> $zsh_path"
+  else
+    echo "  chsh    $current -> $zsh_path (will ask for your password)"
+  fi
   if chsh -s "$zsh_path"; then
     echo "  ok      login shell set; it takes effect on the next login"
     installed+=("login-shell")
@@ -343,6 +359,15 @@ install_mosh() {
   elif have brew; then
     echo "  install mosh (brew)"
     if brew install mosh; then
+      installed+=("mosh")
+    else
+      echo "  FAILED to install mosh" >&2
+      failed+=("mosh")
+      return 0
+    fi
+  elif have pkg; then
+    echo "  install mosh (pkg)"
+    if pkg install -y mosh; then
       installed+=("mosh")
     else
       echo "  FAILED to install mosh" >&2
@@ -426,6 +451,29 @@ print_inventory() {
 }
 
 # ---------------------------------------------------------------------------
+# termux packages
+# ---------------------------------------------------------------------------
+
+ensure_termux_packages() {
+  local script="$DOTFILES_DIR/termux/install-essentials"
+  if [[ ! -x "$script" ]]; then
+    return 0
+  fi
+  if have pkg; then
+    echo "  install termux essentials"
+    if "$script"; then
+      installed+=("termux-essentials")
+    else
+      echo "  FAILED to install termux essentials" >&2
+      failed+=("termux-essentials")
+    fi
+  else
+    echo "  SKIPPED -- 'pkg' not found, skip termux package install"
+    skipped+=("termux-essentials")
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
@@ -452,6 +500,12 @@ fi
 symlink_features
 
 if [[ $DO_LINK_ONLY -eq 0 ]]; then
+  if [[ "$PLATFORM" == "termux" && $DO_PACKAGES -eq 1 ]]; then
+    echo
+    echo "--- termux packages ---"
+    ensure_termux_packages
+  fi
+
   echo
   echo "--- zsh ---"
   ensure_prezto
