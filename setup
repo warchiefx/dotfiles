@@ -295,6 +295,14 @@ ensure_tpm() {
 #
 # Keeps an ssh editing session alive across roaming, sleep and IP changes, which
 # is what editing from a tablet on a cellular link needs.
+#
+# mosh is also in dotemacs's install-prereqs inventory, being an ordinary brew
+# formula. That is not a conflict: both check for it first and skip when it is
+# there, so whichever runs first installs it. It is installed here too because
+# this repository is deployed on machines that have no dotemacs checkout at all.
+#
+# The check below is the part that belongs *only* here, since what it verifies is
+# whether this repository's own zshenv got linked.
 # ---------------------------------------------------------------------------
 
 install_mosh() {
