@@ -23,6 +23,8 @@ for arg in "$@"; do
   esac
 done
 
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$HOME/.local/bin:${PREFIX:-/data/data/com.termux/files/usr}/bin:$PATH"
+
 if ! is_termux && [[ "$FORCE_FLAG" -ne 1 ]]; then
   echo "WARNING: Not running in a Termux environment." >&2
   echo "This script is intended for Termux on Android." >&2
@@ -36,9 +38,10 @@ if ! have pkg; then
 fi
 
 echo "==> Updating Termux package lists..."
-pkg update -y
+pkg update -y || echo "  WARNING: pkg update had errors; continuing with existing package lists..." >&2
 
 PACKAGES=(
+  git
   python
   mosh
   tmux
@@ -57,17 +60,60 @@ echo "    ${PACKAGES[*]}"
 pkg install -y "${PACKAGES[@]}"
 
 echo "==> Setting up uv (Python package manager)..."
+PREFIX_BIN="${PREFIX:-/data/data/com.termux/files/usr}/bin"
+
 if have uv; then
   echo "  ok      uv (found $(command -v uv))"
 else
-  # Try official astral install script, then python -m pip
-  if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
-    echo "  ok      uv installed via astral install script"
-  elif python3 -m pip install uv --break-system-packages 2>/dev/null || python -m pip install uv --break-system-packages 2>/dev/null || pip install uv --break-system-packages 2>/dev/null; then
-    echo "  ok      uv installed via pip"
+  # 1. Try native Termux package via pkg
+  echo "  --> Trying Termux package repository (pkg install uv)..."
+  if pkg install -y uv 2>/dev/null && have uv; then
+    echo "  ok      uv installed via Termux package repository"
+  # 2. Try compiling on-device with cargo/rust
   else
-    echo "  note    uv binary not available for this Android/Termux architecture yet;"
-    echo "          standard python & pip are available."
+    echo "  --> Native package unavailable. Attempting on-device compilation with rust/cargo..."
+    if pkg install -y rust binutils clang make cmake 2>/dev/null; then
+      if cargo install --locked uv; then
+        CARGO_UV="${CARGO_HOME:-$HOME/.cargo}/bin/uv"
+        if [[ -f "$CARGO_UV" ]]; then
+          ln -sf "$CARGO_UV" "$PREFIX_BIN/uv" 2>/dev/null || true
+        fi
+        if have uv; then
+          echo "  ok      uv compiled and installed via cargo"
+        fi
+      fi
+    fi
+  fi
+
+  # 3. Fallbacks: pip or astral install script
+  if ! have uv; then
+    echo "  --> Trying pip / astral installer fallback..."
+    if python3 -m pip install uv --break-system-packages 2>/dev/null; then
+      if [[ -f "$HOME/.local/bin/uv" ]]; then
+        ln -sf "$HOME/.local/bin/uv" "$PREFIX_BIN/uv" 2>/dev/null || true
+      fi
+      if have uv; then
+        echo "  ok      uv installed via pip"
+      fi
+    elif curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
+      if [[ -f "$HOME/.local/bin/uv" ]]; then
+        ln -sf "$HOME/.local/bin/uv" "$PREFIX_BIN/uv" 2>/dev/null || true
+      fi
+      if have uv; then
+        echo "  ok      uv installed via astral install script"
+      fi
+    fi
+  fi
+
+  # Final verification / troubleshooting guidance
+  if have uv; then
+    echo "  ok      uv is ready at $(command -v uv)"
+  else
+    echo "  note    uv could not be installed directly in Termux."
+    echo "          Options:"
+    echo "          1. Run 'pkg install uv' (ensure repositories are updated via 'pkg update')"
+    echo "          2. Compile on-device: 'pkg install rust clang binutils make cmake && cargo install --locked uv'"
+    echo "          3. Use a glibc proot environment: 'pkg install proot-distro && proot-distro install debian'"
   fi
 fi
 
