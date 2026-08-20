@@ -1,0 +1,426 @@
+#!/usr/bin/env bash
+#
+# setup — install this shell environment on a machine.
+#
+# Owns everything needed to make these dotfiles work, which is more than the
+# files themselves: zshrc sources prezto and is inert without it, tmux.conf
+# expects tpm, and mosh needs a PATH that non-interactive ssh shells can see.
+#
+# Deliberately self-contained. It resolves its own directory rather than a path
+# relative to any other checkout, so it runs on a machine that has these
+# dotfiles and nothing else.
+#
+# Usage:
+#   ./setup                 # everything below
+#   ./setup --list          # report what would change, do nothing
+#   ./setup --link-only     # just the symlinks
+#   ./setup --no-mosh       # skip installing mosh
+#   ./setup --no-chsh       # leave the login shell alone
+
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PREZTO_REPO="${PREZTO_REPO:-https://github.com/sorin-ionescu/prezto.git}"
+ZPREZTO_DIR="${ZDOTDIR:-$HOME}/.zprezto"
+TPM_REPO="${TPM_REPO:-https://github.com/tmux-plugins/tpm.git}"
+TPM_DIR="${TPM_DIR:-$HOME/.tmux/plugins/tpm}"
+XDG_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+# Entries here live under $XDG_CONFIG_HOME keeping their own name, rather than
+# becoming a dotfile in $HOME. ghostty reads ~/.config/ghostty on macOS too, so
+# linking it to ~/.ghostty would leave it unread.
+XDG_DOTFILES=(
+  "ghostty"
+)
+
+# Names in this directory that are not dotfiles. `setup` is in here for a
+# concrete reason: this script sits inside the directory it enumerates, so
+# without the exclusion it would cheerfully symlink itself to ~/.setup.
+NOT_A_DOTFILE=(
+  "setup"
+  ".git" ".gitignore" ".gitmodules" ".gitattributes" ".DS_Store"
+)
+
+DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1
+for arg in "$@"; do
+  case "$arg" in
+    --list)      DO_LIST=1 ;;
+    --link-only) DO_LINK_ONLY=1 ;;
+    --no-mosh)   DO_MOSH=0 ;;
+    --no-chsh)   DO_CHSH=0 ;;
+    -h|--help)   awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
+  esac
+done
+
+installed=() skipped=() failed=()
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# ---------------------------------------------------------------------------
+# Which files are dotfiles, and where each one belongs
+# ---------------------------------------------------------------------------
+
+is_xdg_dotfile() {
+  local candidate="$1" name
+  for name in "${XDG_DOTFILES[@]}"; do
+    [[ "$name" == "$candidate" ]] && return 0
+  done
+  return 1
+}
+
+is_excluded() {
+  local candidate="$1" name
+  for name in "${NOT_A_DOTFILE[@]}"; do
+    [[ "$name" == "$candidate" ]] && return 0
+  done
+  case "$candidate" in
+    .|..|README*|LICENSE*|COPYING*|INSTALL*) return 0 ;;
+  esac
+  return 1
+}
+
+dotfiles_list() {
+  local item name
+  for item in "$DOTFILES_DIR"/* "$DOTFILES_DIR"/.*; do
+    [[ -e "$item" || -L "$item" ]] || continue
+    name="$(basename "$item")"
+    is_excluded "$name" && continue
+    is_xdg_dotfile "$name" && continue
+    printf '%s\n' "$name"
+  done | sort -u
+}
+
+# The XDG entries this checkout actually carries, in declared order.
+xdg_dotfiles_list() {
+  local name
+  for name in "${XDG_DOTFILES[@]}"; do
+    [[ -e "$DOTFILES_DIR/$name" || -L "$DOTFILES_DIR/$name" ]] || continue
+    printf '%s\n' "$name"
+  done
+}
+
+dotfile_target() {
+  local name="$1"
+  if is_xdg_dotfile "$name"; then
+    printf '%s/%s\n' "$XDG_CONFIG_DIR" "$name"
+  elif [[ "$name" == .* ]]; then
+    printf '%s/%s\n' "$HOME" "$name"
+  else
+    printf '%s/.%s\n' "$HOME" "$name"
+  fi
+}
+
+# What to call it in the output: relative to $HOME where it is under it, so
+# .zshrc stays .zshrc and ghostty reads .config/ghostty.
+dotfile_label() {
+  printf '%s\n' "${1#"$HOME"/}"
+}
+
+# Is this link in place already? Compared through the symlink's own directory,
+# so a relative link to the same file counts as linked.
+dotfile_linked() {
+  local source="$1" target="$2" link_dest
+  [[ -L "$target" ]] || return 1
+  link_dest="$(readlink "$target" || true)"
+  [[ "$link_dest" == "$source" ]] && return 0
+  [[ -e "$target" && -e "$source" ]] || return 1
+  [[ "$(cd "$(dirname "$target")" && cd "$(dirname "$link_dest")" 2>/dev/null && pwd)/$(basename "$link_dest")" == "$source" ]]
+}
+
+dotfile_status() {
+  local source="$1" target="$2"
+  if [[ -L "$target" ]]; then
+    if dotfile_linked "$source" "$target"; then echo "present"
+    else echo "relink (points to $(readlink "$target" || true))"; fi
+  elif [[ -e "$target" ]]; then
+    echo "exists (not symlinked)"
+  else
+    echo "MISSING"
+  fi
+}
+
+link_dotfile() {
+  local source="$1" target="$2" label="$3" link_dest bak
+
+  if [[ -L "$target" ]]; then
+    if dotfile_linked "$source" "$target"; then
+      echo "  ok      $label (already linked)"
+      skipped+=("dotfile:$label")
+      return 0
+    fi
+    link_dest="$(readlink "$target" || true)"
+    if ln -sfn "$source" "$target"; then
+      echo "  relink  $label -> $source (was $link_dest)"
+      installed+=("dotfile:$label")
+    else
+      echo "  FAILED  to relink $label" >&2
+      failed+=("dotfile:$label")
+    fi
+  elif [[ -e "$target" ]]; then
+    bak="${target}.bak"
+    if [[ -e "$bak" || -L "$bak" ]]; then
+      bak="${target}.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+    if mv "$target" "$bak" && ln -s "$source" "$target"; then
+      echo "  link    $label -> $source (backed up existing to $(basename "$bak"))"
+      installed+=("dotfile:$label")
+    else
+      echo "  FAILED  to link $label (backup failed)" >&2
+      failed+=("dotfile:$label")
+    fi
+  else
+    if ln -s "$source" "$target"; then
+      echo "  link    $label -> $source"
+      installed+=("dotfile:$label")
+    else
+      echo "  FAILED  to link $label" >&2
+      failed+=("dotfile:$label")
+    fi
+  fi
+}
+
+symlink_dotfiles() {
+  echo
+  echo "--- dotfiles (symlinking into $HOME) ---"
+  local files xdg_files name target
+  files="$(dotfiles_list)"
+  xdg_files="$(xdg_dotfiles_list)"
+  if [[ -z "$files" && -z "$xdg_files" ]]; then
+    echo "  skipped -- nothing to link"
+    return 0
+  fi
+  while read -r name; do
+    [[ -n "$name" ]] || continue
+    target="$(dotfile_target "$name")"
+    link_dotfile "$DOTFILES_DIR/$name" "$target" "$(dotfile_label "$target")"
+  done <<<"$files"
+  # $XDG_CONFIG_HOME need not exist yet on a fresh machine.
+  if [[ -n "$xdg_files" ]]; then
+    mkdir -p "$XDG_CONFIG_DIR"
+    while read -r name; do
+      [[ -n "$name" ]] || continue
+      target="$(dotfile_target "$name")"
+      link_dotfile "$DOTFILES_DIR/$name" "$target" "$(dotfile_label "$target")"
+    done <<<"$xdg_files"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# zsh: the shell these files are written for
+# ---------------------------------------------------------------------------
+
+ensure_prezto() {
+  # zshrc sources ${ZDOTDIR:-$HOME}/.zprezto/init.zsh; without it the prompt,
+  # completions and modules that zshrc assumes simply are not there.
+  if [[ -e "$ZPREZTO_DIR" ]]; then
+    echo "  ok      zprezto (found $ZPREZTO_DIR)"
+    skipped+=("zprezto")
+    return 0
+  fi
+  echo "  clone   zprezto -> $ZPREZTO_DIR"
+  if git clone --recursive "$PREZTO_REPO" "$ZPREZTO_DIR"; then
+    installed+=("zprezto")
+  else
+    echo "  FAILED to clone zprezto" >&2
+    failed+=("zprezto")
+  fi
+}
+
+ensure_login_shell() {
+  local zsh_path current
+  if ! have zsh; then
+    echo "  SKIPPED -- zsh is not installed; install it before changing the login shell" >&2
+    failed+=("login-shell")
+    return 0
+  fi
+  zsh_path="$(command -v zsh)"
+  current="${SHELL:-}"
+  if [[ "$current" == "$zsh_path" ]]; then
+    echo "  ok      login shell is already $zsh_path"
+    skipped+=("login-shell")
+    return 0
+  fi
+  # chsh refuses a shell that is not listed in /etc/shells, and the error is
+  # obscure enough to be worth pre-empting.
+  if [[ -r /etc/shells ]] && ! grep -qxF "$zsh_path" /etc/shells; then
+    echo "  SKIPPED -- $zsh_path is not in /etc/shells, so chsh would refuse it." >&2
+    echo "             Add it (needs sudo), then re-run:" >&2
+    echo "               echo $zsh_path | sudo tee -a /etc/shells" >&2
+    failed+=("login-shell")
+    return 0
+  fi
+  # Prompts for a password, which is why this is not silent and not sudo.
+  echo "  chsh    $current -> $zsh_path (will ask for your password)"
+  if chsh -s "$zsh_path"; then
+    echo "  ok      login shell set; it takes effect on the next login"
+    installed+=("login-shell")
+  else
+    echo "  FAILED  chsh did not change the login shell" >&2
+    failed+=("login-shell")
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# tmux plugins
+# ---------------------------------------------------------------------------
+
+ensure_tpm() {
+  if [[ -e "$TPM_DIR" ]]; then
+    echo "  ok      tpm (found $TPM_DIR)"
+    skipped+=("tpm")
+  else
+    echo "  clone   tpm -> $TPM_DIR"
+    if git clone "$TPM_REPO" "$TPM_DIR"; then
+      installed+=("tpm")
+    else
+      echo "  FAILED to clone tpm" >&2
+      failed+=("tpm")
+      return 0
+    fi
+  fi
+  if [[ -x "$TPM_DIR/bin/install_plugins" ]]; then
+    echo "  install tpm plugins"
+    if TMUX_PLUGIN_MANAGER_PATH="$(dirname "$TPM_DIR")" "$TPM_DIR/bin/install_plugins"; then
+      installed+=("tpm-plugins")
+    else
+      echo "  FAILED to install tpm plugins" >&2
+      failed+=("tpm-plugins")
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# mosh
+#
+# Keeps an ssh editing session alive across roaming, sleep and IP changes, which
+# is what editing from a tablet on a cellular link needs.
+# ---------------------------------------------------------------------------
+
+install_mosh() {
+  if have mosh-server; then
+    echo "  ok      mosh (found $(command -v mosh-server))"
+    skipped+=("mosh")
+  elif have brew; then
+    echo "  install mosh (brew)"
+    if brew install mosh; then
+      installed+=("mosh")
+    else
+      echo "  FAILED to install mosh" >&2
+      failed+=("mosh")
+      return 0
+    fi
+  else
+    # Package names diverge enough between distros that guessing is worse than
+    # saying so.
+    echo "  SKIPPED -- mosh not installed and no brew here." >&2
+    echo "             Install it with this machine's package manager" >&2
+    echo "             (apt install mosh / pacman -S mosh / pkg install mosh)." >&2
+    failed+=("mosh")
+    return 0
+  fi
+
+  # The check that matters. mosh starts its server through a *non-interactive*
+  # ssh command -- roughly `ssh host mosh-server new` -- and zsh reads only
+  # ~/.zshenv for one of those, never .zprofile. On Apple Silicon the PATH such
+  # a shell gets is /bin:/usr/bin:/usr/ucb:/usr/local/bin, with no
+  # /opt/homebrew/bin in it, so `mosh host` reports "mosh-server not found" on a
+  # machine where mosh is plainly installed. zshenv in here exists to fix that,
+  # which makes this a check on whether it is linked.
+  if ! have zsh; then
+    echo "  note    zsh absent, so ~/.zshenv is not the relevant path here"
+  elif env -i HOME="$HOME" zsh -c 'command -v mosh-server' >/dev/null 2>&1; then
+    echo "  ok      a non-interactive shell can find mosh-server"
+  else
+    echo "  WARNING mosh-server is installed, but a non-interactive shell cannot" >&2
+    echo "          find it, so connecting fails with 'mosh-server not found'." >&2
+    echo "          ~/.zshenv should be linked -- re-run this script." >&2
+  fi
+  # Reported rather than done: opening a port needs sudo and a decision about
+  # this host's exposure, neither of which belongs in an unattended script.
+  echo "  note    inbound UDP 60000-61000 must reach mosh-server."
+  echo "          macOS: System Settings > Network > Firewall > Options,"
+  echo "          then allow incoming connections for mosh-server."
+}
+
+# ---------------------------------------------------------------------------
+# --list
+# ---------------------------------------------------------------------------
+
+print_inventory() {
+  local name target status
+  echo "== login shell =="
+  if have zsh; then
+    status="$([[ "${SHELL:-}" == "$(command -v zsh)" ]] && echo present || echo "MISSING (is ${SHELL:-unset})")"
+  else
+    status="MISSING (zsh not installed)"
+  fi
+  printf '  %-24s %s\n' "zsh" "$status"
+
+  echo
+  echo "== supporting checkouts =="
+  printf '  %-24s -> %-24s %s\n' ".zprezto" "sorin-ionescu/prezto" \
+    "$([[ -e "$ZPREZTO_DIR" ]] && echo present || echo MISSING)"
+  printf '  %-24s -> %-24s %s\n' ".tmux/plugins/tpm" "tmux-plugins/tpm" \
+    "$([[ -e "$TPM_DIR" ]] && echo present || echo MISSING)"
+  printf '  %-24s %s\n' "mosh" \
+    "$(have mosh-server && echo present || echo MISSING)"
+
+  echo
+  echo "== dotfiles =="
+  local files
+  files="$(dotfiles_list; xdg_dotfiles_list)"
+  if [[ -n "$files" ]]; then
+    while read -r name; do
+      [[ -n "$name" ]] || continue
+      target="$(dotfile_target "$name")"
+      printf '  %-24s -> %-16s %s\n' \
+        "$(dotfile_label "$target")" "$name" \
+        "$(dotfile_status "$DOTFILES_DIR/$name" "$target")"
+    done <<<"$files"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Run
+# ---------------------------------------------------------------------------
+
+echo "==> dotfiles setup ($DOTFILES_DIR)"
+
+if [[ $DO_LIST -eq 1 ]]; then
+  echo
+  print_inventory
+  exit 0
+fi
+
+symlink_dotfiles
+
+if [[ $DO_LINK_ONLY -eq 0 ]]; then
+  echo
+  echo "--- zsh ---"
+  ensure_prezto
+  if [[ $DO_CHSH -eq 1 ]]; then
+    ensure_login_shell
+  fi
+
+  echo
+  echo "--- tmux ---"
+  ensure_tpm
+
+  if [[ $DO_MOSH -eq 1 ]]; then
+    echo
+    echo "--- mosh (remote sessions) ---"
+    install_mosh
+  fi
+fi
+
+echo
+echo "==> Summary"
+echo "    installed:  ${#installed[@]}${installed[*]:+  ${installed[*]}}"
+echo "    already ok: ${#skipped[@]}"
+if [[ ${#failed[@]} -gt 0 ]]; then
+  echo "    FAILED:     ${#failed[@]}  ${failed[*]}" >&2
+  exit 1
+fi
+echo
+echo "Environment ready."
