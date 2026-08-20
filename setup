@@ -258,6 +258,10 @@ ensure_prezto() {
   # prompt, completions and modules that zshrc assumes are simply not there.
   if [[ -e "$ZPREZTO_DIR" ]]; then
     echo "  ok      zprezto (found $ZPREZTO_DIR)"
+    if [[ -d "$ZPREZTO_DIR/.git" ]]; then
+      echo "  sync    zprezto submodules"
+      git -C "$ZPREZTO_DIR" submodule update --init --recursive 2>/dev/null || true
+    fi
     skipped+=("zprezto")
     return 0
   fi

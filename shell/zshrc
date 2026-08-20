@@ -1,8 +1,6 @@
 # OPENSPEC:START
 # OpenSpec shell completions configuration
-fpath=("/Users/warchiefx/.zsh/completions" $fpath)
-autoload -Uz compinit
-compinit
+[[ -d "$HOME/.zsh/completions" ]] && fpath=("$HOME/.zsh/completions" $fpath)
 # OPENSPEC:END
 
 # warchiefx's .zshrc
@@ -143,15 +141,11 @@ load-nvmrc() {
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 
 # opam configuration
-[[ ! -r /Users/warchiefx/.opam/opam-init/init.zsh ]] || source /Users/warchiefx/.opam/opam-init/init.zsh  > /dev/null 2> /dev/null
+[[ -r "$HOME/.opam/opam-init/init.zsh" ]] && source "$HOME/.opam/opam-init/init.zsh" > /dev/null 2> /dev/null
 # eval "$(starship init zsh)"
 
-# The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Users/warchiefx/.docker/completions $fpath)
-autoload -Uz compinit
-compinit
-# End of Docker CLI completions
+# Docker completions
+[[ -d "$HOME/.docker/completions" ]] && fpath=("$HOME/.docker/completions" $fpath)
 
-
-# Added by Antigravity CLI installer
-export PATH="/Users/rrestituyo/.local/bin:$PATH"
+# Local user binaries
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"

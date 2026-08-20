@@ -33,5 +33,6 @@ unset _brew
 
 # Tools installed per-user rather than by a package manager. cargo's bin is
 # where `qs` lands, which is the other thing a remote command could not find.
+[[ -n "${PREFIX-}" && -d "$PREFIX/bin" ]] && path=($PREFIX/bin $PREFIX/bin/applets $path)
 [[ -d $HOME/.cargo/bin ]] && path=($HOME/.cargo/bin $path)
 [[ -d $HOME/.local/bin ]] && path=($HOME/.local/bin $path)
