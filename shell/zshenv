@@ -61,3 +61,6 @@ export NTFY_DEFAULT_HOST="https://atlantis.taila1d74.ts.net:8443"
 export NTFY_DEFAULT_TOPIC="general"
 export NTFY_REGULUS_TOPIC="regulus"
 export NTFY_SERVER="https://atlantis.taila1d74.ts.net:8443"
+
+# Local machine environment overrides and secrets (not tracked in git).
+[[ -r "$HOME/.zshenv.local" ]] && source "$HOME/.zshenv.local"
