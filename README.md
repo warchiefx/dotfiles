@@ -68,7 +68,7 @@ list to maintain for READMEs, licences and the script itself.
 It is self-contained: it resolves its own directory, so it does not care where
 this repository is checked out or what else is on the machine.
 
-## Three things worth knowing
+## Four things worth knowing
 
 **`TERM` is never set here.** The terminal emulator is the only thing that knows
 what it can do, and tmux rewrites `TERM` for its panes, so exporting a value from
@@ -82,6 +82,12 @@ non-interactive, non-login shell, and zsh reads only `.zshenv` for one — never
 `.zprofile`, where the interactive setup lives. Without it `mosh host` fails with
 "mosh-server not found" on a machine where mosh is installed, and a remote `qs` or
 `claude` cannot be found either.
+
+**`ntfy` push notifications & local secrets.** `ntfy/client.yml` configures
+the default self-hosted host and topic. `zshenv` exports `NTFY_DEFAULT_HOST`,
+`NTFY_SERVER`, `NTFY_DEFAULT_TOPIC`, and `NTFY_REGULUS_TOPIC`. It also sources
+`~/.zshenv.local` (mode 0600, untracked) for local uncommitted secrets such as
+`NTFY_TOKEN`. Run `~/.emacs.d/scripts/setup-ntfy-auth` to configure tokens.
 
 **`termux` on Android.** When running in Termux on Android, `setup` links
 `~/.termux/termux.properties` (modern defaults with disabled extra-keys toolbar)
