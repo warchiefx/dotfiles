@@ -1,0 +1,3 @@
+# ~/.config/ntfy/client.yml — default configuration for ntfy CLI
+default-host: "https://atlantis.taila1d74.ts.net:8443"
+default-topic: "general"

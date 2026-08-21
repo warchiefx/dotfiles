@@ -1,0 +1,2 @@
+# source      target                           platform
+client.yml    $XDG_CONFIG_HOME/ntfy/client.yml

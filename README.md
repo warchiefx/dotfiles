@@ -34,6 +34,7 @@ The files are grouped by feature, one directory each:
 shell/     zshrc zshenv zprofile zpreztorc
 tmux/      tmux.conf
 git/       gitconfig
+ntfy/      client.yml
 terminal/  ghostty/ termite/ Xresources
 termux/    termux.properties font.ttf install-essentials
 python/    pycodestyle.cfg pylintrc
