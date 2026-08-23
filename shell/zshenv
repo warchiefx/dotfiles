@@ -20,6 +20,15 @@
 # later is a no-op rather than a growing PATH.
 typeset -gU path PATH
 
+# Language & Locale: ensure UTF-8 environment across all shells (interactive,
+# non-interactive scripts, ssh commands, tmux, and Termux).
+if [[ -z "${LANG-}" ]]; then
+  export LANG='en_US.UTF-8'
+fi
+if [[ -z "${LC_CTYPE-}" ]]; then
+  export LC_CTYPE='en_US.UTF-8'
+fi
+
 # Homebrew, whichever prefix this machine uses: /opt/homebrew on Apple Silicon,
 # /usr/local on Intel. Neither exists on Linux, where these tools are already in
 # /usr/bin, so the loop simply adds nothing there.
