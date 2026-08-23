@@ -52,6 +52,7 @@ unset -f _setup_ssh_agent
 # Customize to your needs...
 alias e=emacsclient
 alias vi=vim
+alias tmux='tmux -u'
 alias murder='sudo kill -9'
 alias t=task
 alias k=kubectl
