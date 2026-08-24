@@ -284,6 +284,32 @@ ensure_prezto() {
   fi
 }
 
+compile_zsh_scripts() {
+  if ! have zsh; then
+    return 0
+  fi
+  echo "  compile zsh dotfiles and prezto (.zwc)"
+  local dot to_compile=()
+  for dot in "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.zpreztorc" "$HOME/.zlogin"; do
+    if [[ -f "$dot" && (! -f "${dot}.zwc" || "$dot" -nt "${dot}.zwc") ]]; then
+      to_compile+=("$dot")
+    fi
+  done
+  if [[ -d "$ZPREZTO_DIR" ]]; then
+    while read -r src; do
+      if [[ -f "$src" && (! -f "${src}.zwc" || "$src" -nt "${src}.zwc") ]]; then
+        to_compile+=("$src")
+      fi
+    done < <(find "$ZPREZTO_DIR" -type f \( -name "*.zsh" -o -name "*.zsh-theme" \) 2>/dev/null)
+  fi
+  if [[ ${#to_compile[@]} -gt 0 ]]; then
+    zsh -c 'for f in "$@"; do zcompile "$f" 2>/dev/null || true; done' _ "${to_compile[@]}"
+    installed+=("zsh-byte-compilation")
+  else
+    skipped+=("zsh-byte-compilation")
+  fi
+}
+
 ensure_login_shell() {
   local zsh_path current
   if ! have zsh; then
@@ -560,6 +586,7 @@ if [[ $DO_LINK_ONLY -eq 0 ]]; then
   echo
   echo "--- zsh ---"
   ensure_prezto
+  compile_zsh_scripts
   if [[ $DO_CHSH -eq 1 ]]; then
     ensure_login_shell
   fi

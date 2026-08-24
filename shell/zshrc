@@ -56,6 +56,12 @@ alias tmux='tmux -u'
 alias murder='sudo kill -9'
 alias t=task
 alias k=kubectl
+alias x=unarchive
+alias xd=lsarchive
+
+# Autosuggestions async fetching and strategies
+export ZSH_AUTOSUGGEST_USE_ASYNC=1
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 # If bat (https://github.com/sharkdp/bat) is available, use instead of cat
 command -v bat >/dev/null 2>&1 && alias cat=bat
 
