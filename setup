@@ -348,6 +348,15 @@ ensure_tpm() {
       echo "  FAILED to install tpm plugins" >&2
       failed+=("tpm-plugins")
     fi
+    local thumbs_dir="$(dirname "$TPM_DIR")/tmux-thumbs"
+    if [[ -d "$thumbs_dir" && ! -f "$thumbs_dir/target/release/thumbs" ]]; then
+      if have cargo; then
+        echo "  build   tmux-thumbs binary (cargo)"
+        if cargo build --release --manifest-path "$thumbs_dir/Cargo.toml" --target-dir "$thumbs_dir/target" >/dev/null 2>&1; then
+          installed+=("tmux-thumbs-binary")
+        fi
+      fi
+    fi
   fi
 }
 

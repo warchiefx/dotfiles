@@ -53,6 +53,7 @@ PACKAGES=(
   curl
   openssh
   gh
+  fzf
 )
 
 echo "==> Installing essential Termux packages..."
