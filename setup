@@ -352,6 +352,98 @@ ensure_login_shell() {
 # tmux plugins
 # ---------------------------------------------------------------------------
 
+# A plugin's clone directory is named after the *repository* alone -- tpm takes
+# `basename' of the plugin spec and drops any `#ref' (scripts/install_plugins.sh,
+# `IFS='#' read'). So two owners publishing a repository of the same name collide
+# on one directory, and tpm's "already installed" test is that directory
+# existing -- it never looks at where the clone came from.
+#
+# Which is a silent wrong answer rather than a failure. Switching the theme from
+# dracula/tmux to catppuccin/tmux left the old dracula clone in
+# ~/.tmux/plugins/tmux, tpm reported "Already installed", and tmux.conf's
+# @catppuccin_* options went to a plugin that never reads them. Every other
+# plugin in the same run installed fine, so nothing looked broken.
+#
+# Compared by owner/repo rather than by URL: the same repository is reached over
+# https, over ssh and with credentials embedded, and no spelling of it is wrong.
+_repo_slug() {
+  local url="${1%.git}"
+  url="${url%/}"
+  # Collapse ':' into '/' so scheme, credentials and host fall away with the rest
+  # of the leading path once only the last two segments are kept.
+  url="${url//:/\/}"
+  local repo="${url##*/}"
+  local rest="${url%/*}"
+  local owner="${rest##*/}"
+  printf '%s/%s' "$owner" "$repo" | tr '[:upper:]' '[:lower:]'
+}
+
+ensure_tpm_plugin_origins() {
+  local conf="$DOTFILES_DIR/tmux/tmux.conf"
+  local plugins_dir
+  plugins_dir="$(dirname "$TPM_DIR")"
+  [[ -f "$conf" ]] || return 0
+  [[ -d "$plugins_dir" ]] || return 0
+
+  # tpm decides from the *live* tmux.conf, so acting on this repository's copy is
+  # only sound while the two are the same file. On a run that did not link tmux
+  # -- `--only shell' -- they need not be, and a hand-written ~/.tmux.conf
+  # declaring other plugins must not have its clones moved aside on the strength
+  # of a file tmux never reads.
+  local src target rest linked=0
+  if [[ -f "$DOTFILES_DIR/tmux/manifest" ]]; then
+    while IFS=$'\t' read -r src target rest; do
+      [[ "$src" == "tmux.conf" ]] || continue
+      dotfile_linked "$conf" "$target" && linked=1
+    done < <(manifest_entries tmux)
+  fi
+  [[ $linked -eq 1 ]] || return 0
+
+  local spec name dir want got aside n
+  while read -r spec; do
+    [[ -n "$spec" ]] || continue
+    spec="${spec%%#*}"                 # drop the '#ref' tpm strips too
+    # No owner, no comparison: a bare "tpm" would normalise to tpm/tpm and so
+    # mismatch every real clone, moving a correct plugin aside over a typo tpm
+    # cannot clone from either.
+    [[ "$spec" == */* ]] || continue
+    want="$(_repo_slug "$spec")"
+    name="$(basename "$spec")"; name="${name%.git}"
+    dir="$plugins_dir/$name"
+    [[ -d "$dir" ]] || continue        # not installed yet; tpm will clone it
+
+    # tpm itself is ensure_tpm's to manage, and moving it aside here would take
+    # bin/install_plugins with it -- leaving the run installing nothing at all,
+    # silently, since the step below only tests whether that file is executable.
+    # A tpm cloned from a fork or a mirror is a legitimate reason for the slugs
+    # to differ, so this cannot be left to the comparison.
+    [[ "$dir" != "$TPM_DIR" ]] || continue
+
+    if [[ ! -d "$dir/.git" ]]; then
+      echo "  WARNING $name is not a git clone, so its origin cannot be checked;" >&2
+      echo "          tpm will treat it as installed. Remove $dir to re-clone." >&2
+      continue
+    fi
+
+    got="$(_repo_slug "$(git -C "$dir" remote get-url origin 2>/dev/null || true)")"
+    [[ -n "$got" && "$got" != "/" && "$got" != "$want" ]] || continue
+
+    # Moved, not deleted: the directory is a clone and cheap to restore, but it
+    # is not this script's to throw away.
+    aside="$dir.replaced-${got%%/*}"
+    n=1
+    while [[ -e "$aside" ]]; do aside="$dir.replaced-${got%%/*}.$n"; n=$((n + 1)); done
+    echo "  fix     $name holds $got but tmux.conf declares $want"
+    if mv "$dir" "$aside"; then
+      echo "          moved to $aside; tpm will clone the declared plugin"
+      installed+=("tpm-plugin-dir-$name")
+    else
+      echo "  FAILED  could not move $dir aside" >&2
+      failed+=("tpm-plugin-dir-$name")
+    fi
+  done < <(awk '/^[ \t]*set(-option)? +-g +@plugin/ { gsub(/'\''/,""); gsub(/"/,""); print $4 }' "$conf")
+}
+
 ensure_tpm() {
   if [[ -e "$TPM_DIR" ]]; then
     echo "  ok      tpm (found $TPM_DIR)"
@@ -366,6 +458,10 @@ ensure_tpm() {
       return 0
     fi
   fi
+  # Before tpm decides what is "already installed", since that test is the
+  # clone directory existing and cannot see a stale plugin occupying it.
+  ensure_tpm_plugin_origins
+
   if [[ -x "$TPM_DIR/bin/install_plugins" ]]; then
     echo "  install tpm plugins"
     if TMUX_PLUGIN_MANAGER_PATH="$(dirname "$TPM_DIR")" "$TPM_DIR/bin/install_plugins"; then
