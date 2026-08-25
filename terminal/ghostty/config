@@ -9,11 +9,22 @@ macos-option-as-alt = true
 macos-titlebar-style = hidden
 
 # Keybindings
+# Clear default Ghostty keybindings so macOS menu accelerators (like super+d split,
+# super+n window, super+c copy, super+a select all) do not intercept Caps Lock (Command)
+# before key-remap can convert it to Control.
+keybind = clear
+
 # Remap super <-> ctrl so macOS Caps Lock (mapped to Command) sends terminal Ctrl
-# while physical Control triggers Ghostty super shortcuts (copy, paste, tabs).
+# while physical Control triggers Ghostty super shortcuts.
 key-remap = super=ctrl
 key-remap = ctrl=super
+
 keybind = global:ctrl+escape=toggle_quick_terminal
+keybind = super+shift+,=reload_config
+keybind = super+==increase_font_size:1
+keybind = super++=increase_font_size:1
+keybind = super+-=decrease_font_size:1
+keybind = super+0=reset_font_size
 
 background-opacity = 0.83
 
