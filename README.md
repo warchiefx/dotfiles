@@ -91,10 +91,12 @@ the default self-hosted host and topic. `zshenv` exports `NTFY_DEFAULT_HOST`,
 
 **`termux` on Android.** When running in Termux on Android, `setup` links
 `~/.termux/termux.properties` (modern defaults with disabled extra-keys toolbar)
-and `~/.termux/font.ttf` (Iosevka Term font), reloads settings, and installs
-packages via `termux/install-essentials` (python, mosh, tmux, zsh, vim, uv,
-termux-api, nodejs, wget, curl, openssh, gh). `termux/install-essentials` can
-also be run standalone.
+and `~/.termux/font.ttf` (Iosevka Term Nerd Font with full icon and Powerline
+support), reloads settings, and installs packages via `termux/install-essentials`
+(python, mosh, tmux, zsh, vim, uv, termux-api, nodejs, wget, curl, openssh, gh, fzf)
+with font verification. `termux/install-essentials` can also be run standalone.
+If Nerd Fonts are not installable in a custom environment, tmux status indicators
+support fallback to representative Unicode characters.
 
 ## Tests
 

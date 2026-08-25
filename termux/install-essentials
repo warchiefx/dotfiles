@@ -118,5 +118,36 @@ else
   fi
 fi
 
+echo "==> Verifying Termux font & Nerd Font icons..."
+TERMUX_FONT="$HOME/.termux/font.ttf"
+if [[ -f "$TERMUX_FONT" ]]; then
+  echo "  ok      terminal font found at $TERMUX_FONT"
+else
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$SCRIPT_DIR/font.ttf" ]]; then
+    mkdir -p "$HOME/.termux"
+    cp "$SCRIPT_DIR/font.ttf" "$TERMUX_FONT" 2>/dev/null || ln -sf "$SCRIPT_DIR/font.ttf" "$TERMUX_FONT"
+    echo "  ok      installed bundled Iosevka Term Nerd Font to $TERMUX_FONT"
+    if have termux-reload-settings; then
+      termux-reload-settings || true
+    fi
+  else
+    echo "  --> Downloading Iosevka Term Nerd Font..."
+    mkdir -p "$HOME/.termux"
+    local_archive="/tmp/IosevkaTerm.tar.xz"
+    if curl -sL "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/IosevkaTerm.tar.xz" -o "$local_archive" 2>/dev/null && tar -xf "$local_archive" -C "$HOME/.termux" IosevkaTermNerdFont-Regular.ttf 2>/dev/null; then
+      mv -f "$HOME/.termux/IosevkaTermNerdFont-Regular.ttf" "$TERMUX_FONT"
+      rm -f "$local_archive"
+      echo "  ok      downloaded and installed Iosevka Term Nerd Font to $TERMUX_FONT"
+      if have termux-reload-settings; then
+        termux-reload-settings || true
+      fi
+    else
+      rm -f "$local_archive"
+      echo "  note    Nerd Font could not be installed directly. Terminal will fallback to representative characters."
+    fi
+  fi
+fi
+
 echo
 echo "==> Termux essentials installed successfully."
