@@ -9,9 +9,12 @@ macos-option-as-alt = true
 macos-titlebar-style = hidden
 
 # Keybindings
+# Remap super <-> ctrl so macOS Caps Lock (mapped to Command) sends terminal Ctrl
+# while physical Control triggers Ghostty super shortcuts (copy, paste, tabs).
+key-remap = super=ctrl
+key-remap = ctrl=super
 keybind = global:ctrl+escape=toggle_quick_terminal
 
-theme = ayu
 background-opacity = 0.83
 
 cursor-style = block
