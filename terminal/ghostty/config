@@ -26,6 +26,39 @@ keybind = super++=increase_font_size:1
 keybind = super+-=decrease_font_size:1
 keybind = super+0=reset_font_size
 
+# Copy and paste.  `keybind = clear' took Ghostty's own super+c and super+v out
+# along with the menu accelerators, and nothing put them back -- with
+# copy-on-select false as well, there was no route to the clipboard from the
+# keyboard at all.
+#
+# `super' here means the *physical Control* key, because key-remap above is
+# applied before keybind matching ("This affects both keybind matching and
+# terminal input encoding", ghostty +show-config --docs).  So copy is physical
+# Ctrl+C, and Caps Lock (Command) + C still remaps to ctrl+c and reaches the
+# shell as SIGINT, which is the whole point of the remap.
+#
+# `performable:' is what makes these safe to have back rather than a return of
+# the bug `clear' was added for.  Ghostty's docs say a menu binding "will
+# trigger before any remapping is done", so a plain `super+c' would be
+# registered as the Edit > Copy accelerator and macOS would swallow Caps Lock + C
+# before key-remap ever saw it -- SIGINT gone again.  A performable keybind
+# "will not appear as menu shortcuts in the application menu", so it is bound
+# without ever becoming an accelerator.  The same reasoning covers paste: as a
+# menu shortcut it would eat Caps Lock + V, and `C-v' is scroll-down in Emacs.
+#
+# The cost of `performable:' is that copy only consumes the key when there is a
+# selection to copy.  With nothing selected, physical Ctrl+C does nothing, which
+# is the right outcome here -- SIGINT is Caps Lock + C by design.
+keybind = performable:super+c=copy_to_clipboard:mixed
+keybind = performable:super+v=paste_from_clipboard
+keybind = performable:super+shift+v=paste_from_selection
+
+# The dedicated clipboard keys some keyboards carry.  No modifier, so no menu
+# accelerator to worry about; these are simply part of the default set that
+# `clear' removed.
+keybind = copy=copy_to_clipboard:mixed
+keybind = paste=paste_from_clipboard
+
 background-opacity = 0.83
 
 cursor-style = block
