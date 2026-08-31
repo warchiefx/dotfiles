@@ -67,6 +67,12 @@ if [[ -z "${SSH_AUTH_SOCK-}" && ( -n "${TERMUX_VERSION-}" || "$OSTYPE" == linux-
   export SSH_AUTH_SOCK="$HOME/.ssh/ssh-agent.sock"
 fi
 
+# On Termux / Android, configure OSFONTDIR so LuaLaTeX and fontspec locate user
+# and system fonts (~/.local/share/fonts, ~/.fonts, /system/fonts).
+if [[ -z "${OSFONTDIR-}" && ( -n "${TERMUX_VERSION-}" || "$OSTYPE" == linux-android* || -d "/data/data/com.termux" ) ]]; then
+  export OSFONTDIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts:$HOME/.fonts:${PREFIX:-/data/data/com.termux/files/usr}/share/fonts:/system/fonts"
+fi
+
 # ntfy default server and topics for shell scripts, cron jobs, and CLI tools.
 export NTFY_DEFAULT_HOST="https://atlantis.taila1d74.ts.net:8443"
 export NTFY_DEFAULT_TOPIC="general"

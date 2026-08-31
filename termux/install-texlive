@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+#
+# install-texlive — install and configure TeX Live, LuaLaTeX, and CTAN packages
+#                   for publication-grade Org mode LaTeX/PDF export in Termux.
+#
+# Usage:
+#   ./install-texlive               # install TeX Live (scheme-small) + required CTAN packages
+#   ./install-texlive --list        # list packages and status without installing
+#   ./install-texlive --scheme full # install custom scheme (e.g. scheme-small, scheme-basic, scheme-full)
+#   FORCE=1 ./install-texlive       # bypass Termux environment check
+#
+
+set -euo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+is_termux() {
+  [[ -n "${TERMUX_VERSION:-}" || "${PREFIX:-}" == *"/com.termux/"* || -d "/data/data/com.termux" ]] || [[ "$(uname -o 2>/dev/null)" == "Android" ]]
+}
+
+FORCE_FLAG="${FORCE:-0}"
+DO_LIST=0
+SCHEME="scheme-small"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -f|--force)   FORCE_FLAG=1 ;;
+    -l|--list)    DO_LIST=1 ;;
+    -s|--scheme)  shift; [[ $# -gt 0 ]] || { echo "--scheme needs a scheme name (e.g. scheme-small, scheme-basic)" >&2; exit 2; }; SCHEME="$1" ;;
+    --scheme=*)   SCHEME="${1#*=}" ;;
+    -h|--help)    awk 'NR<3 {next} /^#/ {sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$HOME/.local/bin:${PREFIX:-/data/data/com.termux/files/usr}/bin:$PATH"
+
+# Ensure TeX Live paths are sourced if profile exists
+if [[ -f "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/texlive.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/texlive.sh"
+fi
+
+if ! is_termux && [[ "$FORCE_FLAG" -ne 1 ]]; then
+  echo "WARNING: Not running in a Termux environment." >&2
+  echo "This script is intended for Termux on Android." >&2
+  echo "Set FORCE=1 or pass --force to run anyway." >&2
+  exit 1
+fi
+
+# Required CTAN packages for wcx-org export (ox-latex / beamer / modern typography)
+# Format: "pkg_name:probe_file"
+REQUIRED_CTAN_PACKAGES=(
+  "koma-script:scrartcl.cls"
+  "scrlayer-scrpage:scrlayer-scrpage.sty"
+  "geometry:geometry.sty"
+  "xcolor:xcolor.sty"
+  "colortbl:colortbl.sty"
+  "lastpage:lastpage.sty"
+  "microtype:microtype.sty"
+  "sourcesanspro:sourcesanspro.sty"
+  "fontspec:fontspec.sty"
+  "hyphenat:hyphenat.sty"
+  "booktabs:booktabs.sty"
+  "adjustbox:adjustbox.sty"
+  "collectbox:collectbox.sty"
+  "tcolorbox:tcolorbox.sty"
+  "fontawesome5:fontawesome5.sty"
+  "pgf:tikz.sty"
+  "listings:listings.sty"
+  "beamer:beamer.cls"
+  "translator:translator.sty"
+  "latexmk:latexmk"
+)
+
+if [[ $DO_LIST -eq 1 ]]; then
+  echo "== Termux TeX Live & LuaLaTeX Status =="
+  printf '  %-20s (probe: %-12s) %s\n' "texlive-bin" "lualatex" "$(have lualatex && echo present || echo MISSING)"
+  printf '  %-20s (probe: %-12s) %s\n' "tlmgr" "tlmgr" "$(have tlmgr && echo present || echo MISSING)"
+  printf '  %-20s (probe: %-12s) %s\n' "kpsewhich" "kpsewhich" "$(have kpsewhich && echo present || echo MISSING)"
+
+  echo
+  echo "== CTAN Packages (wcx-org export stack) =="
+  if have kpsewhich; then
+    for entry in "${REQUIRED_CTAN_PACKAGES[@]}"; do
+      pkg="${entry%%:*}"; probe="${entry##*:}"
+      if kpsewhich "$probe" >/dev/null 2>&1 || ( [[ "$probe" == "latexmk" ]] && have latexmk ); then
+        status="present"
+      else
+        status="MISSING"
+      fi
+      printf '  %-20s (probe: %-22s) %s\n' "$pkg" "$probe" "$status"
+    done
+  else
+    echo "  (kpsewhich not installed; install TeX Live first)"
+  fi
+  exit 0
+fi
+
+if ! have pkg; then
+  echo "ERROR: 'pkg' command not found. Please run within Termux or install Termux packages." >&2
+  exit 1
+fi
+
+echo "==> Step 1: Installing Termux TeX Live binaries and installer..."
+pkg update -y || true
+pkg install -y texlive-bin texlive-installer
+
+# Source TeX Live environment if freshly installed
+if [[ -f "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/texlive.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/texlive.sh"
+fi
+
+echo "==> Step 2: Ensuring TeX Live distribution is installed..."
+if ! have tlmgr; then
+  if have termux-install-tl; then
+    echo "  --> Running termux-install-tl (scheme: $SCHEME)..."
+    echo "      This installs TeX Live tailored to the Termux prefix."
+    termux-install-tl --scheme="$SCHEME" || termux-install-tl
+  else
+    echo "ERROR: termux-install-tl not found after installing texlive-installer." >&2
+    exit 1
+  fi
+fi
+
+# Ensure profile is sourced
+if [[ -f "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/texlive.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${PREFIX:-/data/data/com.termux/files/usr}/etc/profile.d/texlive.sh"
+fi
+
+echo "==> Step 3: Generating LuaLaTeX engine format..."
+if have fmtutil-sys; then
+  fmtutil-sys --byfmt lualatex || true
+fi
+
+echo "==> Step 4: Installing required CTAN packages for Org mode export..."
+missing_ctan=()
+if have kpsewhich; then
+  for entry in "${REQUIRED_CTAN_PACKAGES[@]}"; do
+    pkg="${entry%%:*}"; probe="${entry##*:}"
+    if [[ "$probe" == "latexmk" ]]; then
+      if ! have latexmk; then missing_ctan+=("$pkg"); fi
+    elif ! kpsewhich "$probe" >/dev/null 2>&1; then
+      missing_ctan+=("$pkg")
+    fi
+  done
+else
+  # If kpsewhich isn't working yet, attempt to install all declared packages
+  for entry in "${REQUIRED_CTAN_PACKAGES[@]}"; do
+    missing_ctan+=("${entry%%:*}")
+  done
+fi
+
+if [[ ${#missing_ctan[@]} -eq 0 ]]; then
+  echo "  ok      all required CTAN packages are present"
+elif have tlmgr; then
+  echo "  --> Installing missing CTAN packages: ${missing_ctan[*]}"
+  tlmgr install "${missing_ctan[@]}" || {
+    echo "  WARNING: Bulk install failed; attempting one-by-one install..."
+    for p in "${missing_ctan[@]}"; do
+      tlmgr install "$p" || echo "  warning: failed to install $p via tlmgr" >&2
+    done
+  }
+else
+  echo "ERROR: Missing CTAN packages (${missing_ctan[*]}), but 'tlmgr' is not available." >&2
+  exit 1
+fi
+
+echo "==> Step 5: Configuring fonts and luaotfload cache..."
+FONT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
+mkdir -p "$FONT_DIR"
+export OSFONTDIR="$FONT_DIR:$HOME/.fonts:${PREFIX:-/data/data/com.termux/files/usr}/share/fonts:/system/fonts"
+
+if have luaotfload-tool; then
+  echo "  --> Refreshing luaotfload font database (discovering Iosevka and system fonts)..."
+  luaotfload-tool -uf || true
+fi
+
+echo "==> Step 6: Verifying LuaLaTeX compilation pipeline..."
+TEST_TEX_DIR="$(mktemp -d "${TMPDIR:-/tmp}/texlive-test.XXXXXX")"
+TEST_TEX_FILE="$TEST_TEX_DIR/test.tex"
+
+cat << 'EOF' > "$TEST_TEX_FILE"
+\documentclass{scrartcl}
+\usepackage{fontspec}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+\begin{document}
+\title{Termux LuaLaTeX Verification}
+\maketitle
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title=Org Export Status]
+LuaLaTeX and dotemacs CTAN packages verified successfully in Termux!
+\end{tcolorbox}
+\end{document}
+EOF
+
+if have lualatex; then
+  if (cd "$TEST_TEX_DIR" && lualatex -interaction=nonstopmode test.tex >/dev/null 2>&1); then
+    echo "  ok      test document compiled successfully to PDF!"
+  else
+    echo "  warning: test compilation failed; inspect logs or re-run 'termux-patch-texlive'." >&2
+  fi
+else
+  echo "  warning: 'lualatex' binary not found; test compilation skipped." >&2
+fi
+
+rm -rf "$TEST_TEX_DIR"
+
+echo
+echo "==> TeX Live / LuaLaTeX setup complete!"
+echo "    You can now export Org buffers and subtrees to PDF using 'C-c o e' (or 'M-x wcx/transient-org-export')."
