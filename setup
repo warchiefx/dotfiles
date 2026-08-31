@@ -20,10 +20,11 @@
 #   ./setup --list               # report what would change, do nothing
 #   ./setup --only shell --only tmux   # just these features
 #   ./setup --skip js            # everything but these
-#   ./setup --link-only          # symlinks, no prezto/tpm/mosh/packages
+#   ./setup --link-only          # symlinks, no prezto/tpm/mosh/packages/fonts
 #   ./setup --no-packages        # skip installing Termux packages
 #   ./setup --no-mosh            # skip installing mosh
 #   ./setup --no-chsh            # leave the login shell alone
+#   ./setup --no-fonts           # skip downloading and installing fonts
 #   ./setup --hostname <name>    # set machine name for prompt (~/.hostname)
 
 set -euo pipefail
@@ -34,8 +35,11 @@ ZPREZTO_DIR="${ZDOTDIR:-$HOME}/.zprezto"
 TPM_REPO="${TPM_REPO:-https://github.com/tmux-plugins/tpm.git}"
 TPM_DIR="${TPM_DIR:-$HOME/.tmux/plugins/tpm}"
 XDG_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+IOSEVKA_REPO="${IOSEVKA_REPO:-be5invis/Iosevka}"
+IOSEVKA_BASE_URL="${IOSEVKA_BASE_URL:-https://github.com/${IOSEVKA_REPO}/releases}"
+DEFAULT_IOSEVKA_VERSION="34.8.1"
 
-DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1 DO_PACKAGES=1
+DO_LIST=0 DO_LINK_ONLY=0 DO_MOSH=1 DO_CHSH=1 DO_PACKAGES=1 DO_FONTS=1
 CUSTOM_HOSTNAME=""
 ONLY=() SKIP=()
 while [[ $# -gt 0 ]]; do
@@ -45,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --no-packages) DO_PACKAGES=0 ;;
     --no-mosh)     DO_MOSH=0 ;;
     --no-chsh)     DO_CHSH=0 ;;
+    --no-fonts)    DO_FONTS=0 ;;
     --hostname|-H) shift; [[ $# -gt 0 ]] || { echo "--hostname needs a name" >&2; exit 2; }; CUSTOM_HOSTNAME="$1" ;;
     --only)        shift; [[ $# -gt 0 ]] || { echo "--only needs a feature name" >&2; exit 2; }; ONLY+=("$1") ;;
     --skip)        shift; [[ $# -gt 0 ]] || { echo "--skip needs a feature name" >&2; exit 2; }; SKIP+=("$1") ;;
@@ -553,6 +558,151 @@ install_mosh() {
 }
 
 # ---------------------------------------------------------------------------
+# Fonts (Iosevka and Iosevka Term)
+# ---------------------------------------------------------------------------
+
+target_font_dir() {
+  case "$PLATFORM" in
+    macos) echo "$HOME/Library/Fonts" ;;
+    *)     echo "${XDG_DATA_HOME:-$HOME/.local/share}/fonts" ;;
+  esac
+}
+
+has_iosevka_fonts() {
+  local font_dir
+  font_dir="$(target_font_dir)"
+  [[ -d "$font_dir" ]] || return 1
+  local has_base=0 has_term=0
+  local f base ext
+  for f in "$font_dir"/*[iI]osevka* "$font_dir"/*IOSEVKA*; do
+    [[ -f "$f" ]] || continue
+    ext="${f##*.}"
+    case "$ext" in
+      ttf|TTF|ttc|TTC|otf|OTF) ;;
+      *) continue ;;
+    esac
+    base="$(basename "$f")"
+    if [[ "$base" == *Term* || "$base" == *term* || "$base" == *TERM* ]]; then
+      has_term=1
+    else
+      has_base=1
+    fi
+  done
+  [[ $has_base -eq 1 && $has_term -eq 1 ]]
+}
+
+get_latest_iosevka_version() {
+  if [[ -n "${IOSEVKA_VERSION:-}" ]]; then
+    local v="${IOSEVKA_VERSION#v}"
+    echo "$v"
+    return 0
+  fi
+  local tag=""
+  if have curl; then
+    local redir
+    redir="$(curl -sIL -o /dev/null -w '%{url_effective}' "${IOSEVKA_BASE_URL}/latest" 2>/dev/null || true)"
+    if [[ -n "$redir" && "$redir" == *"/tag/"* ]]; then
+      tag="${redir##*/}"
+    fi
+  fi
+  if [[ -z "$tag" ]] && have gh; then
+    tag="$(gh release view --repo "$IOSEVKA_REPO" --json tagName --jq .tagName 2>/dev/null || true)"
+  fi
+  if [[ -n "$tag" ]]; then
+    echo "${tag#v}"
+  else
+    echo "$DEFAULT_IOSEVKA_VERSION"
+  fi
+}
+
+ensure_fonts() {
+  local font_dir
+  font_dir="$(target_font_dir)"
+
+  if has_iosevka_fonts; then
+    echo "  ok      fonts (Iosevka and Iosevka Term found in $(dotfile_label "$font_dir"))"
+    skipped+=("fonts")
+    return 0
+  fi
+
+  if ! have curl && ! have wget; then
+    echo "  FAILED  neither curl nor wget is available to download fonts" >&2
+    failed+=("fonts")
+    return 0
+  fi
+
+  local version tag
+  version="$(get_latest_iosevka_version)"
+  tag="v${version}"
+  echo "  download Iosevka and Iosevka Term ($tag) -> $(dotfile_label "$font_dir")"
+
+  mkdir -p "$font_dir"
+  local tmp_dir
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/iosevka-fonts.XXXXXX")"
+  trap 'rm -rf "$tmp_dir"' EXIT INT TERM
+  local dl_failed=0
+  local family zip_name zip_url zip_path
+
+  for family in "Iosevka" "IosevkaTerm"; do
+    zip_name="PkgTTF-${family}-${version}.zip"
+    zip_url="${IOSEVKA_BASE_URL}/download/${tag}/${zip_name}"
+    zip_path="$tmp_dir/$zip_name"
+
+    echo "          fetching $zip_name..."
+    if have curl; then
+      if ! curl -sSL -f "$zip_url" -o "$zip_path"; then
+        echo "  FAILED  failed to download $zip_url" >&2
+        dl_failed=1
+        break
+      fi
+    elif have wget; then
+      if ! wget -q -O "$zip_path" "$zip_url"; then
+        echo "  FAILED  failed to download $zip_url" >&2
+        dl_failed=1
+        break
+      fi
+    fi
+
+    echo "          extracting $family fonts..."
+    if have unzip; then
+      if ! unzip -q -o "$zip_path" "*.ttf" -d "$font_dir" 2>/dev/null; then
+        if ! unzip -q -o "$zip_path" -d "$font_dir"; then
+          echo "  FAILED  failed to unzip $zip_path" >&2
+          dl_failed=1
+          break
+        fi
+      fi
+    elif have python3; then
+      if ! python3 -c "import zipfile, sys; z = zipfile.ZipFile(sys.argv[1]); [z.extract(m, sys.argv[2]) for m in z.namelist() if m.endswith('.ttf') or m.endswith('.ttc')]" "$zip_path" "$font_dir"; then
+        echo "  FAILED  failed to extract $zip_path with python3" >&2
+        dl_failed=1
+        break
+      fi
+    else
+      echo "  FAILED  neither unzip nor python3 is available to extract $zip_path" >&2
+      dl_failed=1
+      break
+    fi
+  done
+
+  rm -rf "$tmp_dir"
+  trap - EXIT INT TERM
+
+  if [[ $dl_failed -eq 1 ]]; then
+    failed+=("fonts")
+    return 0
+  fi
+
+  if have fc-cache; then
+    echo "  refresh font cache (fc-cache)"
+    fc-cache -f "$font_dir" >/dev/null 2>&1 || true
+  fi
+
+  echo "  ok      installed Iosevka and Iosevka Term fonts to $(dotfile_label "$font_dir")"
+  installed+=("fonts")
+}
+
+# ---------------------------------------------------------------------------
 # --list
 # ---------------------------------------------------------------------------
 
@@ -574,6 +724,8 @@ print_inventory() {
     "$([[ -e "$TPM_DIR" ]] && echo present || echo MISSING)"
   printf '  %-24s %s\n' "mosh" \
     "$(have mosh-server && echo present || echo MISSING)"
+  printf '  %-24s %s\n' "fonts (iosevka)" \
+    "$(has_iosevka_fonts && echo present || echo MISSING)"
 
   while read -r feature; do
     echo
@@ -695,6 +847,12 @@ if [[ $DO_LINK_ONLY -eq 0 ]]; then
     echo
     echo "--- mosh (remote sessions) ---"
     install_mosh
+  fi
+
+  if [[ $DO_FONTS -eq 1 ]]; then
+    echo
+    echo "--- fonts (iosevka) ---"
+    ensure_fonts
   fi
 fi
 

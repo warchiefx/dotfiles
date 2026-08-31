@@ -12,10 +12,12 @@ git clone https://github.com/warchiefx/dotfiles.git ~/dotfiles
 ```
 
 `setup` owns the whole environment, not just the files — `zshrc` sources prezto
-and is inert without it, `tmux.conf` expects tpm, and mosh needs a `PATH` that
-non-interactive ssh shells can actually see. So it links the files, clones prezto
+and is inert without it, `tmux.conf` expects tpm, mosh needs a `PATH` that
+non-interactive ssh shells can actually see, and our terminal and editor configs
+expect Iosevka and Iosevka Term fonts. So it links the files, clones prezto
 into `~/.zprezto`, `chsh`es the login shell to zsh, installs tpm and its tmux
-plugins, and installs mosh — then checks the thing that actually breaks mosh.
+plugins, installs mosh (then checks the thing that actually breaks mosh), and
+downloads and installs the Iosevka and Iosevka Term font families.
 
 ```bash
 ./setup --list                 # report what would change, do nothing
@@ -24,6 +26,7 @@ plugins, and installs mosh — then checks the thing that actually breaks mosh.
 ./setup --link-only            # just the symlinks
 ./setup --no-packages          # skip Termux package install
 ./setup --no-mosh --no-chsh    # skip mosh / leave the login shell alone
+./setup --no-fonts             # skip font download and install
 ```
 
 ## Layout
