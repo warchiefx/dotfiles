@@ -26,6 +26,9 @@ keybind = super++=increase_font_size:1
 keybind = super+-=decrease_font_size:1
 keybind = super+0=reset_font_size
 
+# Restore default window clearing (screen and scrollback) removed by `keybind = clear'
+keybind = super+k=clear_screen
+
 # Copy and paste.  `keybind = clear' took Ghostty's own super+c and super+v out
 # along with the menu accelerators, and nothing put them back -- with
 # copy-on-select false as well, there was no route to the clipboard from the
