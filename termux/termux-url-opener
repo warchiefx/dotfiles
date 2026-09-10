@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+#
+# termux-url-opener - Handle shared URLs from Android in Termux
+#
+# Termux invokes ~/bin/termux-url-opener whenever a URL or text is shared
+# to Termux via Android's share menu (ACTION_SEND / ACTION_VIEW).
+#
+# If Emacs is running as a daemon/server, this captures the link into
+# readlater.org with the :LATER: tag via emacsclient.
+# If Emacs is not running, it directly appends the entry to readlater.org.
+# User feedback is provided via termux-notification when available.
+
+set -euo pipefail
+
+RAW_INPUT="${1:-}"
+
+if [[ -z "$RAW_INPUT" ]]; then
+    exit 0
+fi
+
+# Extract URL if embedded in text (e.g. "Check this out: https://example.com/foo")
+# or use full raw input if no HTTP/HTTPS prefix found.
+if [[ "$RAW_INPUT" =~ (https?://[^[:space:]]+) ]]; then
+    URL="${BASH_REMATCH[1]}"
+    TITLE="$(printf '%s' "$RAW_INPUT" | sed -E "s|https?://[^[:space:]]+||g" | tr -s ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+else
+    URL="$RAW_INPUT"
+    TITLE=""
+fi
+
+if [[ -n "$TITLE" ]]; then
+    HEADING="$TITLE - $URL"
+else
+    HEADING="$URL"
+fi
+
+# Locate Org files directory
+if [[ -n "${WCX_ORG_DIR:-}" ]]; then
+    ORG_DIR="$WCX_ORG_DIR"
+elif [[ -d "$HOME/Work/orgfiles" ]]; then
+    ORG_DIR="$HOME/Work/orgfiles"
+elif [[ -d "$HOME/org" ]]; then
+    ORG_DIR="$HOME/org"
+else
+    ORG_DIR="$HOME/Work/orgfiles"
+fi
+
+TARGET_FILE="$ORG_DIR/readlater.org"
+TIMESTAMP="$(date '+%Y-%m-%d %a %H:%M')"
+CAPTURED=0
+
+# Check if emacsclient can connect to an active Emacs daemon
+if [[ "${WCX_DISABLE_EMACSCLIENT:-}" != "1" ]] && command -v emacsclient >/dev/null 2>&1 && emacsclient -e 't' >/dev/null 2>&1; then
+    B64_URL="$(printf '%s' "$URL" | base64 | tr -d '\r\n')"
+    B64_TITLE="$(printf '%s' "$TITLE" | base64 | tr -d '\r\n')"
+    ELISP_EXPR="(progn
+      (let* ((url (decode-coding-string (base64-decode-string \"${B64_URL}\") 'utf-8))
+             (title (decode-coding-string (base64-decode-string \"${B64_TITLE}\") 'utf-8))
+             (file (if (fboundp 'wcx/org-file)
+                       (wcx/org-file \"readlater.org\")
+                     \"${TARGET_FILE}\"))
+             (heading (if (string-empty-p title)
+                          url
+                        (format \"%s - %s\" title url)))
+             (buf (find-file-noselect file)))
+        (with-current-buffer buf
+          (org-mode)
+          (goto-char (point-min))
+          (if (re-search-forward \"^\\\\*+ +Read Later\" nil t)
+              (org-insert-subheading nil)
+            (goto-char (point-max))
+            (unless (bolp) (insert \"\\n\"))
+            (insert \"* \"))
+          (insert (format \"TODO %s :LATER:\\n[%s]\\n\\n\"
+                          heading
+                          (format-time-string \"%Y-%m-%d %a %H:%M\")))
+          (save-buffer)
+          t)))"
+
+    if emacsclient -e "$ELISP_EXPR" >/dev/null 2>&1; then
+        CAPTURED=1
+    fi
+fi
+
+# Fallback: append directly to file if Emacs server is offline or failed
+if [[ $CAPTURED -ne 1 ]]; then
+    mkdir -p "$(dirname "$TARGET_FILE")"
+    if [[ ! -f "$TARGET_FILE" ]]; then
+        cat <<EOF > "$TARGET_FILE"
+#+TITLE: Read Later
+
+* Read Later
+** TODO $HEADING :LATER:
+[$TIMESTAMP]
+
+EOF
+        CAPTURED=1
+    else
+        # Try inserting under * Read Later if present
+        INSERTED=0
+        if grep -q "^\* Read Later" "$TARGET_FILE" 2>/dev/null; then
+            if command -v python3 >/dev/null 2>&1; then
+                python3 -c "
+import sys, re
+target, heading, ts = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    with open(target, 'r', encoding='utf-8') as f:
+        content = f.read()
+    pattern = re.compile(r'^(\*+ +Read Later.*)$', re.MULTILINE)
+    m = pattern.search(content)
+    if m:
+        idx = m.end()
+        entry = f'\n** TODO {heading} :LATER:\n[{ts}]\n'
+        new_content = content[:idx] + entry + content[idx:]
+        with open(target, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
+" "$TARGET_FILE" "$HEADING" "$TIMESTAMP" && INSERTED=1
+            fi
+        fi
+
+        if [[ $INSERTED -ne 1 ]]; then
+            cat <<EOF >> "$TARGET_FILE"
+
+* TODO $HEADING :LATER:
+[$TIMESTAMP]
+EOF
+        fi
+        CAPTURED=1
+    fi
+fi
+
+# User notification via termux-notification
+if command -v termux-notification >/dev/null 2>&1; then
+    termux-notification \
+        --title "Captured link to Org" \
+        --content "$URL" \
+        --priority "default" || true
+fi
+
+exit 0
